@@ -29,28 +29,33 @@ export function Marquee({
     >
       <div className='bulbs' aria-hidden='true' />
       <div className='letterboard text-deep grid gap-6 rounded-sm px-5 py-6 sm:grid-cols-[1fr_auto] sm:items-end sm:px-8'>
-        <div className='flex flex-wrap items-center gap-x-4 gap-y-2 sm:col-span-2'>
-          <span className='font-display text-2xl font-black tracking-[0.06em]'>
-            SORTARR
-          </span>
-          <span className='mr-auto text-sm whitespace-nowrap text-[#47615d]'>
-            {remaining === undefined
-              ? 'Connecting to Radarr'
-              : `${remaining} films to go`}
-          </span>
+        <div className='flex items-center gap-3 sm:col-span-2 sm:gap-4'>
+          <div className='mr-auto flex min-w-0 flex-col sm:flex-row sm:items-center sm:gap-4'>
+            <span className='font-display text-2xl font-black tracking-[0.06em]'>
+              SORTARR
+            </span>
+            <span className='text-sm whitespace-nowrap text-[#47615d]'>
+              {remaining === undefined
+                ? 'Connecting to Radarr'
+                : `${remaining} films to go`}
+            </span>
+          </div>
           <button
             onClick={onRefresh}
             disabled={busy}
-            className='inline-flex items-center gap-2 rounded-full border-[1.5px] border-[#9fb6b1] px-3.5 py-1.5 text-sm font-semibold whitespace-nowrap disabled:opacity-50'
+            aria-label={loading ? 'Connecting…' : 'Refresh library'}
+            className='inline-flex size-9 shrink-0 items-center justify-center gap-2 rounded-full border-[1.5px] border-[#9fb6b1] text-sm font-semibold whitespace-nowrap disabled:opacity-50 sm:size-auto sm:px-3.5 sm:py-1.5'
           >
             {loading ? (
               <Spinner className='size-3.5' />
             ) : (
               <RefreshCwIcon className='size-3.5' />
             )}
-            {loading ? 'Connecting…' : 'Refresh library'}
+            <span aria-hidden='true' className='hidden sm:inline'>
+              {loading ? 'Connecting…' : 'Refresh library'}
+            </span>
           </button>
-          {menu}
+          <div className='shrink-0'>{menu}</div>
         </div>
         <div>
           <p className='font-display text-xl font-extrabold tracking-[0.14em] sm:text-[26px]'>
