@@ -174,3 +174,33 @@ test('rejects cross-origin and invalid search submissions', async ({
   })
   expect(invalid.status()).toBe(400)
 })
+
+test('signed-out visitors are sent to sign-in and the API refuses them', async ({
+  browser
+}) => {
+  const context = await browser.newContext({
+    storageState: { cookies: [], origins: [] }
+  })
+  try {
+    const page = await context.newPage()
+    await page.goto('/')
+    await expect(page).toHaveURL(/\/auth\/sign-in\?redirectTo=%2F/)
+    await expect(page.getByText('Sign in to Sortarr')).toBeVisible()
+    for (const [method, path] of [
+      ['GET', '/api/library'],
+      ['POST', '/api/search']
+    ] as const) {
+      const response = await context.request.fetch(path, {
+        method,
+        headers: { Origin: 'http://127.0.0.1:43210' },
+        data: method === 'POST' ? { movieIds: [1] } : undefined
+      })
+      expect(response.status()).toBe(401)
+    }
+    expect(
+      (await (await context.request.get('/api/health')).json()).status
+    ).toBe('ok')
+  } finally {
+    await context.close()
+  }
+})

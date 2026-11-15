@@ -131,6 +131,8 @@ const child = Bun.spawn(['bun', 'server/production.ts'], {
     ...process.env,
     HOST: '127.0.0.1',
     PORT: '43210',
+    APP_ORIGIN: 'http://127.0.0.1:43210',
+    BETTER_AUTH_URL: 'http://127.0.0.1:43210',
     RADARR_URL: 'http://127.0.0.1:43211/radarr',
     RADARR_API_KEY: 'fixture-key'
   },

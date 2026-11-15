@@ -1,5 +1,15 @@
 import path from 'node:path'
 import { revision } from './revision'
+import { readEnv } from '../src/server/env'
+
+// Fail fast on missing auth or database settings. The error names the
+// settings, never their values.
+try {
+  readEnv()
+} catch (error) {
+  console.error(error instanceof Error ? error.message : 'Invalid settings')
+  process.exit(1)
+}
 const root = path.resolve('dist/client')
 const app = (await import(path.resolve('dist/server/server.js'))).default as {
   fetch(request: Request): Promise<Response>

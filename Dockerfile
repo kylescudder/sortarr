@@ -21,6 +21,9 @@ RUN bun install --frozen-lockfile --production --ignore-scripts
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/server ./server
 COPY --from=build /app/shared ./shared
+# Owner-only migrations run from this image as a one-shot before the app starts.
+COPY --from=build /app/drizzle ./drizzle
+COPY --from=build /app/src/server/env.ts ./src/server/env.ts
 USER 501:20
 EXPOSE 3210
 HEALTHCHECK --interval=20s --timeout=5s --start-period=15s --retries=3 CMD bun -e "const r = await fetch('http://127.0.0.1:3210/api/health'); process.exit(r.ok ? 0 : 1)"

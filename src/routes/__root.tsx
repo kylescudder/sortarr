@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import styles from '@/styles.css?url'
+import { Toaster } from '@/components/ui/sonner'
 
 export const Route = createRootRoute({
   head: () => ({
@@ -17,9 +18,18 @@ export const Route = createRootRoute({
     ],
     links: [{ rel: 'stylesheet', href: styles }]
   }),
-  component: Outlet,
+  component: RootComponent,
   shellComponent: RootDocument
 })
+
+function RootComponent() {
+  return (
+    <>
+      <Outlet />
+      <Toaster />
+    </>
+  )
+}
 
 function RootDocument({ children }: { children: ReactNode }) {
   return (

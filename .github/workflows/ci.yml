@@ -11,6 +11,18 @@ jobs:
   check:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.6-alpine
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
+          # Only this disposable job-local PostgreSQL uses trust authentication.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -26,11 +38,16 @@ jobs:
         run: bun run lint
       - name: Check formatting
         run: bun run format:check
-      - name: Test
+      - name: Test, including auth against a real database
+        env:
+          TEST_DATABASE_URL: postgres://postgres@127.0.0.1:5432/postgres
         run: bun run test
       - name: Build
         run: bun run build
-      - name: Test the backlog in a browser against a fake Radarr
+      - name: Test the backlog in a browser as a signed-in member, against a fake Radarr
+        env:
+          E2E_DATABASE_URL: postgres://postgres@127.0.0.1:5432/sortarr_e2e
+          E2E_SKIP_BUILD: '1'
         run: |
           bunx --no-install playwright install --with-deps chromium
           bun run test:e2e
@@ -39,8 +56,7 @@ jobs:
         with:
           name: playwright-evidence
           path: |
-            playwright-report/
-            test-results/
+            state/e2e/
           retention-days: 7
       - name: Build the production image without publishing
         run: docker build --build-arg SORTARR_REVISION="$GITHUB_SHA" -t sortarr:ci .

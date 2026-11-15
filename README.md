@@ -2,23 +2,27 @@
 
 A Radarr backlog browser for the Forge arr stack: list the films you still need,
 shortest first, and send selected batches to Radarr to search. Public hostname:
-**sortarr.thescudders.org** (behind the stack's Cloudflare Access app). Unrelated
-to the Jaredharper1/Sortarr project.
+**sortarr.thescudders.org**, for allowlisted members signed in with Better
+Auth. Unrelated to the Jaredharper1/Sortarr project.
 
 ## Development
 
 Use Bun 1.4.4. Install the committed dependencies with
 `bun install --frozen-lockfile`. This also installs the pre-commit hook.
 
-Copy `.env.example` to `.env` and set `RADARR_URL` and `RADARR_API_KEY`; see
-[Runtime configuration](#runtime-configuration). There is no database: Radarr
-is the source of truth.
+Copy `.env.example` to `.env` and fill in the values; see
+[Runtime configuration](#runtime-configuration). Start a disposable Postgres
+for local work:
 
 ```sh
+docker run -d --name sortarr-db -e POSTGRES_HOST_AUTH_METHOD=trust -p 5432:5432 postgres:18-alpine
+docker exec sortarr-db createdb -U postgres sortarr
+bun run db:migrate
 bun run dev
 ```
 
-Open **http://127.0.0.1:3210**. The API key stays on the server.
+Open **http://127.0.0.1:3210** and sign in with an address on
+`AUTH_ALLOWED_EMAILS`. The Radarr API key stays on the server.
 
 ## Checks
 
@@ -28,13 +32,23 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). In short:
 bun run format:check
 bun run lint
 bun run typecheck
-bun run test
+bun run test       # needs TEST_DATABASE_URL pointing at a disposable Postgres
 bun run build
-bun run test:e2e   # after the build; install Chromium once with bunx --no-install playwright install chromium
+bun run test:e2e   # provisions its own throwaway Postgres and member
 ```
 
-The Playwright suite runs the production build against a fake Radarr on ports
-43210 and 43211. It never contacts a real Radarr or downloads anything.
+`test:e2e` starts a throwaway Postgres (or uses `E2E_DATABASE_URL`), seeds a
+verified member with a random password, then runs Playwright against the
+production build and a fake Radarr. It never contacts a real Radarr or sends
+email.
+
+## Database
+
+Drizzle owns the schema (`src/server/schema.ts`): Better Auth's `auth_*`
+tables and `user_profile` for profile photos. Generate migrations with
+`bun run db:generate` and commit them; never edit an applied migration.
+Migrations are additive. Dropping a column takes two releases: stop using it,
+then drop it.
 
 ## Deployment
 
@@ -53,8 +67,10 @@ docker --context colima compose up -d sortarr
 
 Roll back by pinning `image:` to a previous `sha-<commit>` tag. The
 `forge-udms` Cloudflare Tunnel routes `sortarr.thescudders.org` to
-`sortarr:3210`. The `Forge UDMS arr stack` Access application protects it, so
-Sortarr has no login of its own and must never publish a host port.
+`sortarr:3210`; the container publishes no host port. Better Auth is the only
+gate. The stack also runs `sortarr-db` (Postgres 18, owner and restricted
+runtime roles created on first start) and a `sortarr-migrate` one-shot that
+applies migrations with the owner role before the app starts.
 
 ## Searching in Radarr
 
@@ -70,15 +86,31 @@ sends `MoviesSearch` to Radarr. A receipt means Radarr accepted the search. It
 does not mean a download started; check Radarr's Activity page. Searches must
 come from the app's own origin (`APP_ORIGIN` in production).
 
+## Sign-in
+
+Better Auth with password, email code, magic link and passkey, as in the other
+house apps. There is no sign-up: an address on `AUTH_ALLOWED_EMAILS` gets an
+account the first time it signs in by email code or magic link, and can set a
+password later from Profile. The allowlist is checked on every request, so
+removing an address revokes access immediately. Everything except
+`/api/health` and the sign-in pages requires a signed-in member.
+
 ## Runtime configuration
 
-| Variable           | Required   | Purpose                                                                               |
-| ------------------ | ---------- | ------------------------------------------------------------------------------------- |
-| `RADARR_URL`       | yes        | Radarr base URL, including any URL base. `http://radarr:7878` on Forge                |
-| `RADARR_API_KEY`   | yes        | From Radarr → Settings → General → Security                                           |
-| `APP_ORIGIN`       | production | Public https origin that searches must come from: `https://sortarr.thescudders.org`   |
-| `HOST`             | no         | Bind address: `127.0.0.1` by default, `0.0.0.0` in the image                          |
-| `PORT`             | no         | `3210`                                                                                |
-| `SORTARR_REVISION` | no         | Set by the image build. Reported by `/api/health` and the `X-Sortarr-Revision` header |
+| Variable                 | Required | Purpose                                                                               |
+| ------------------------ | -------- | ------------------------------------------------------------------------------------- |
+| `DATABASE_URL`           | yes      | Postgres connection for the runtime role                                              |
+| `APP_ORIGIN`             | yes      | Public https origin: `https://sortarr.thescudders.org`                                |
+| `BETTER_AUTH_URL`        | yes      | Must equal `APP_ORIGIN`                                                               |
+| `BETTER_AUTH_SECRET`     | yes      | 32+ random characters, stable across releases                                         |
+| `BREVO_API_KEY`          | yes      | Transactional email                                                                   |
+| `AUTH_EMAIL_FROM`        | yes      | `sortarr@kylescudder.co.uk`                                                           |
+| `AUTH_EMAIL_DAILY_LIMIT` | yes      | `40`                                                                                  |
+| `AUTH_ALLOWED_EMAILS`    | yes      | Comma-separated addresses that may sign in                                            |
+| `RADARR_URL`             | yes      | Radarr base URL, including any URL base. `http://radarr:7878` on Forge                |
+| `RADARR_API_KEY`         | yes      | From Radarr → Settings → General → Security                                           |
+| `HOST`                   | no       | Bind address: `127.0.0.1` by default, `0.0.0.0` in the image                          |
+| `PORT`                   | no       | `3210`                                                                                |
+| `SORTARR_REVISION`       | no       | Set by the image build. Reported by `/api/health` and the `X-Sortarr-Revision` header |
 
 Errors name a missing variable, never its value. Never commit `.env`.
