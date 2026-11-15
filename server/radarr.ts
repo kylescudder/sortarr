@@ -1,5 +1,8 @@
 import { z } from 'zod'
 import type { Library } from '../shared/movies'
+import { readOriginEnv, readRadarrEnv } from './env'
+import { ApiError } from './errors'
+export { ApiError }
 const movieSchema = z.object({
   id: z.number().int().positive(),
   title: z.string(),
@@ -13,44 +16,17 @@ const movieSchema = z.object({
   overview: z.string().default(''),
   status: z.string().default('unknown')
 })
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    public status = 502
-  ) {
-    super(message)
-  }
-}
 async function radarr(path: string, options?: RequestInit) {
-  const base = process.env.RADARR_URL?.trim()
-  const key = process.env.RADARR_API_KEY?.trim()
-  if (!base || !key)
-    throw new ApiError(
-      'Set RADARR_URL and RADARR_API_KEY on the server, then restart Sortarr.',
-      503
-    )
-  let url: URL
-  try {
-    url = new URL(`${base.replace(/\/+$/, '')}/api/v3/${path}`)
-    if (
-      !['http:', 'https:'].includes(url.protocol) ||
-      url.username ||
-      url.password ||
-      url.search ||
-      url.hash
-    )
-      throw new Error()
-  } catch {
-    throw new ApiError(
-      'RADARR_URL must be an HTTP or HTTPS base URL without credentials or a query.',
-      503
-    )
-  }
+  const { RADARR_URL, RADARR_API_KEY } = readRadarrEnv()
+  const url = new URL(`${RADARR_URL}/api/v3/${path}`)
   let response: Response
   try {
     response = await fetch(url, {
       ...options,
-      headers: { 'X-Api-Key': key, 'Content-Type': 'application/json' },
+      headers: {
+        'X-Api-Key': RADARR_API_KEY,
+        'Content-Type': 'application/json'
+      },
       signal: AbortSignal.timeout(15000),
       redirect: 'error'
     })
@@ -106,11 +82,7 @@ export async function library(): Promise<Library> {
 let searchInProgress = false
 export async function search(request: Request) {
   // Require the browser's actual origin; do not trust forwarded headers for this check.
-  // Behind Cloudflare Tunnel the container sees plain HTTP, so production pins
-  // the public https origin with APP_ORIGIN.
-  const expected =
-    process.env.APP_ORIGIN?.trim().replace(/\/+$/, '') ||
-    new URL(request.url).origin
+  const expected = readOriginEnv().APP_ORIGIN ?? new URL(request.url).origin
   if (request.headers.get('origin') !== expected)
     throw new ApiError('Search must be submitted from this app.', 403)
   const input = z
