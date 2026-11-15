@@ -106,7 +106,12 @@ export async function library(): Promise<Library> {
 let searchInProgress = false
 export async function search(request: Request) {
   // Require the browser's actual origin; do not trust forwarded headers for this check.
-  if (request.headers.get('origin') !== new URL(request.url).origin)
+  // Behind Cloudflare Tunnel the container sees plain HTTP, so production pins
+  // the public https origin with APP_ORIGIN.
+  const expected =
+    process.env.APP_ORIGIN?.trim().replace(/\/+$/, '') ||
+    new URL(request.url).origin
+  if (request.headers.get('origin') !== expected)
     throw new ApiError('Search must be submitted from this app.', 403)
   const input = z
     .object({ movieIds: z.array(z.number().int().positive()).min(1).max(20) })
