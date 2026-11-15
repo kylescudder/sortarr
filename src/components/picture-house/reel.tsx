@@ -70,7 +70,8 @@ export function Reel({
                 <FilmStatusLine
                   status={statuses[movie.id]}
                   now={now}
-                  onSearchAgain={() => !picked && onToggle(movie.id, true)}
+                  canPick={!picked && !limitReached && !disabled}
+                  onSearchAgain={() => onToggle(movie.id, true)}
                 />
               )}
             </div>

@@ -286,3 +286,22 @@ test('says when a search found nothing and offers to pick the film again', async
     'ADMIT 1'
   )
 })
+
+test('says when progress can’t be checked, without hiding the backlog', async ({
+  page,
+  request
+}) => {
+  await request.post('http://127.0.0.1:43211/control', {
+    data: { mode: 'queue-failed' }
+  })
+  await page.goto('/')
+  await expect(rows(page)).toHaveCount(3)
+  await expect(
+    page.getByText(
+      'Couldn’t check progress with Radarr: Radarr returned HTTP 500.'
+    )
+  ).toBeVisible()
+  await expect(
+    page.getByText('Progress isn’t shown until Radarr answers.')
+  ).toBeVisible()
+})

@@ -171,7 +171,11 @@ function Backlog() {
   }
   function toggle(id: number, picked: boolean) {
     setSelected((old) =>
-      picked ? [...old, id] : old.filter((other) => other !== id)
+      picked
+        ? old.includes(id) || old.length >= MAX_SELECTION
+          ? old
+          : [...old, id]
+        : old.filter((other) => other !== id)
     )
     setConfirming(false)
   }
@@ -327,6 +331,17 @@ function Backlog() {
           <p className='text-muted-foreground text-sm'>
             These films have no usable runtime in Radarr. They are never counted
             as zero-minute films.
+          </p>
+        )}
+        {status.error && (
+          <p className='text-destructive flex items-start gap-2 text-sm'>
+            <CircleAlertIcon className='mt-0.5 size-4 shrink-0' />
+            <span>
+              Couldn’t check progress with Radarr: {status.error.message}{' '}
+              {status.data
+                ? `Progress shown is from ${new Date(status.data.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`
+                : 'Progress isn’t shown until Radarr answers.'}
+            </span>
           </p>
         )}
         {error && (

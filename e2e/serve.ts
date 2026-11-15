@@ -141,6 +141,8 @@ const mock = Bun.serve({
     }
     if (pathname === '/radarr/api/v3/command/42')
       return Response.json({ id: 42, status: commandStatus })
+    if (pathname === '/radarr/api/v3/queue' && mode === 'queue-failed')
+      return new Response(null, { status: 500 })
     if (pathname === '/radarr/api/v3/queue')
       return Response.json({ records: queue })
     if (pathname === '/radarr/api/v3/history/since') return Response.json(grabs)

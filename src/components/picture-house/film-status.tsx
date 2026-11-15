@@ -19,11 +19,13 @@ const ago = (iso: string, now: number) => {
 export function FilmStatusLine({
   status,
   now,
-  onSearchAgain
+  onSearchAgain,
+  canPick = true
 }: {
   status: FilmStatus
   now: number
   onSearchAgain: () => void
+  canPick?: boolean
 }) {
   const line = 'mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm'
   switch (status.state) {
@@ -87,7 +89,8 @@ export function FilmStatusLine({
           No release found when searched {ago(status.searchedAt, now)}.
           <button
             onClick={onSearchAgain}
-            className='text-foreground underline underline-offset-4'
+            disabled={!canPick}
+            className='text-foreground underline underline-offset-4 disabled:no-underline disabled:opacity-50'
           >
             Pick to search again
           </button>
