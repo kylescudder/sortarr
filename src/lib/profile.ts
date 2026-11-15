@@ -12,9 +12,16 @@ export async function profileRequest(
   init?: RequestInit
 ): Promise<Profile> {
   const response = await fetch(path, init)
-  const body = await response.json()
+  // An error from in front of the app (e.g. a size limit) may not be JSON.
+  const body = await response.json().catch(() => null)
   if (!response.ok)
-    throw new Error(body.error ?? 'Unable to load your profile.')
+    throw new Error(
+      body?.error ??
+        (response.status === 413
+          ? 'This photo is too large. Choose a smaller one.'
+          : 'Unable to update your profile. Try again.')
+    )
+  if (!body) throw new Error('Unable to read your profile. Try again.')
   return body
 }
 

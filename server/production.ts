@@ -17,7 +17,11 @@ const app = (await import(path.resolve('dist/server/server.js'))).default as {
 const server = Bun.serve({
   hostname: process.env.HOST || '127.0.0.1',
   port: Number(process.env.PORT || 3210),
-  maxRequestBodySize: 8192,
+  // Above the profile photo's own 2 MB limit (enforced, with a JSON error, in
+  // src/server/profile-handler.ts). Every other route takes small JSON bodies
+  // and validates them; a lower cap here cut photo uploads off with an empty
+  // 413 that browsers couldn't read.
+  maxRequestBodySize: 3 * 1024 * 1024,
   async fetch(request) {
     const url = new URL(request.url)
     if (['GET', 'HEAD'].includes(request.method)) {

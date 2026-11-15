@@ -1,18 +1,19 @@
 import { test, expect } from '@playwright/test'
+import { randomBytes } from 'node:crypto'
 import sharp from 'sharp'
 
-// A large photo, like a 24 MP iPhone shot, as a JPEG.
-const photo = async () =>
-  sharp({
-    create: {
-      width: 5712,
-      height: 4284,
-      channels: 3,
-      background: '#e8b04b'
-    }
+// A 12 MP photo, the size iPhones save by default. Random pixels don't
+// compress, so the cropped 512 px upload is well over 100 KB, like a real
+// photo; a flat colour compressed to a few KB and hid an 8 KB body limit.
+const photo = () => {
+  const width = 4032
+  const height = 3024
+  return sharp(randomBytes(width * height * 3), {
+    raw: { width, height, channels: 3 }
   })
-    .jpeg({ quality: 80 })
+    .jpeg({ quality: 90 })
     .toBuffer()
+}
 
 for (const iphoneLimit of [false, true])
   test(`uploads and removes a profile photo${iphoneLimit ? ' when createImageBitmap refuses it, as iOS Safari does' : ''}`, async ({
@@ -28,6 +29,13 @@ for (const iphoneLimit of [false, true])
             )
           )
       })
+    // The server must accept a realistically sized upload (a body limit
+    // once cut these off with an empty 413).
+    const upload = page.waitForResponse(
+      (r) =>
+        r.url().endsWith('/api/profile/avatar') &&
+        r.request().method() === 'PUT'
+    )
     await page.goto('/profile')
     await page.getByRole('button', { name: 'Sign out' }).waitFor()
     await page.locator('input[type=file]').setInputFiles({
@@ -35,6 +43,7 @@ for (const iphoneLimit of [false, true])
       mimeType: 'image/jpeg',
       buffer: await photo()
     })
+    expect((await upload).status()).toBe(200)
     const avatar = page.locator('img[src^="/api/profile/avatar?v="]').first()
     await expect(avatar).toBeVisible()
     const response = await page.request.get((await avatar.getAttribute('src'))!)
