@@ -102,6 +102,10 @@ function queueStatus(item: QueueItem): FilmStatus {
   }
 }
 
+// Radarr and Sortarr run on separate clocks; a grab stamped up to a minute
+// before the search (by Radarr's clock) still belongs to it.
+export const CLOCK_SKEW_MS = 60_000
+
 export function deriveStatuses({
   queue,
   searches,
@@ -136,7 +140,7 @@ export function deriveStatuses({
         grabs.some(
           (g) =>
             g.movieId === movieId &&
-            Date.parse(g.date) >= Date.parse(searchedAt)
+            Date.parse(g.date) >= Date.parse(searchedAt) - CLOCK_SKEW_MS
         )
       )
         statuses[movieId] = { state: 'grabbed', searchedAt }

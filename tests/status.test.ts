@@ -37,6 +37,16 @@ test('a command Radarr has forgotten counts as finished', () => {
   ).toEqual({ state: 'not-found', searchedAt: at })
 })
 
+test('a grab stamped slightly before the search by Radarr’s clock still counts', () => {
+  expect(
+    derive({
+      searches: [{ commandId: 7, movieIds: [1], createdAt: at }],
+      commands: { 7: 'completed' },
+      grabs: [{ movieId: 1, date: '2026-11-15T18:59:30Z' }]
+    })[1]?.state
+  ).toBe('grabbed')
+})
+
 test('a grab after the search, no longer queued, is grabbed', () => {
   expect(
     derive({

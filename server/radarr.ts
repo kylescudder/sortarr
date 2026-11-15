@@ -3,6 +3,7 @@ import type { Library } from '../shared/movies'
 import { readOriginEnv, readRadarrEnv } from './env'
 import { ApiError } from './errors'
 import {
+  CLOCK_SKEW_MS,
   deriveStatuses,
   type CommandState,
   type SearchRecord
@@ -19,7 +20,8 @@ const movieSchema = z.object({
   tags: z.array(z.number()).default([]),
   genres: z.array(z.string()).default([]),
   overview: z.string().default(''),
-  status: z.string().default('unknown')
+  status: z.string().default('unknown'),
+  images: z.array(z.object({ coverType: z.string() })).default([])
 })
 async function radarr(
   path: string,
@@ -83,6 +85,7 @@ export async function library(): Promise<Library> {
         tags: m.tags,
         genres: m.genres,
         overview: m.overview,
+        hasPoster: m.images.some((image) => image.coverType === 'poster'),
         status: m.status
       })),
     tags: tags.data,
@@ -183,7 +186,7 @@ export async function activity(searches: SearchRecord[], now = Date.now()) {
     radarr('queue?page=1&pageSize=1000&includeMovie=false'),
     searches.length
       ? radarr(
-          `history/since?date=${encodeURIComponent(new Date(oldest).toISOString())}&eventType=grabbed`
+          `history/since?date=${encodeURIComponent(new Date(oldest - CLOCK_SKEW_MS).toISOString())}&eventType=grabbed`
         )
       : [],
     Promise.all(
@@ -201,6 +204,38 @@ export async function activity(searches: SearchRecord[], now = Date.now()) {
     searches,
     commands: Object.fromEntries(commands),
     grabs: parsedGrabs.data
+  })
+}
+
+// Radarr resizes and caches posters itself; fetched server-side so the API key
+// never reaches the browser and nothing is loaded from TMDb.
+export async function poster(movieId: number, width: 250 | 500) {
+  const { RADARR_URL, RADARR_API_KEY } = readRadarrEnv()
+  let response: Response
+  try {
+    response = await fetch(
+      `${RADARR_URL}/api/v3/mediacover/${movieId}/poster-${width}.jpg`,
+      {
+        headers: { 'X-Api-Key': RADARR_API_KEY },
+        signal: AbortSignal.timeout(15000),
+        redirect: 'error'
+      }
+    )
+  } catch {
+    throw new ApiError('Could not reach Radarr for this poster.')
+  }
+  if (response.status === 404)
+    throw new ApiError('No poster for this film.', 404)
+  if (!response.ok || response.headers.get('content-type') !== 'image/jpeg')
+    throw new ApiError('Radarr could not supply this poster.')
+  return new Response(response.body, {
+    headers: {
+      'Content-Type': 'image/jpeg',
+      // Posters rarely change; keep them in this browser for a day.
+      'Cache-Control': 'private, max-age=86400',
+      'X-Content-Type-Options': 'nosniff',
+      'Cross-Origin-Resource-Policy': 'same-origin'
+    }
   })
 }
 

@@ -72,7 +72,8 @@ const stub = {
   movies: [] as object[],
   commandStatus: 'queued',
   queue: [] as object[],
-  grabs: [] as object[]
+  grabs: [] as object[],
+  grabOnSearch: false
 }
 const authOrigin = 'https://sortarr.auth.test'
 const allowedEmails = ['member@example.com', 'second@example.com']
@@ -127,8 +128,18 @@ beforeAll(async () => {
         return new Response(null, { status: 401 })
       if (pathname === '/api/v3/movie') return Response.json(stub.movies)
       if (pathname === '/api/v3/tag') return Response.json([])
-      if (pathname === '/api/v3/command' && request.method === 'POST')
+      if (pathname === '/api/v3/command' && request.method === 'POST') {
+        // Radarr can grab a release within the same moment it accepts a search.
+        if (stub.grabOnSearch) {
+          stub.grabs = [{ movieId: 501, date: new Date().toISOString() }]
+          // Answering takes a moment, as with a real Radarr, so the ticket
+          // is only stored after the grab.
+          return Bun.sleep(25).then(() =>
+            Response.json({ id: 9001, status: 'queued' }, { status: 201 })
+          )
+        }
         return Response.json({ id: 9001, status: 'queued' }, { status: 201 })
+      }
       if (pathname === '/api/v3/command/9001')
         return Response.json({ id: 9001, status: stub.commandStatus })
       if (pathname === '/api/v3/queue')
@@ -417,7 +428,47 @@ test('searches are recorded for the member and their progress is reported from R
       movies: [],
       commandStatus: 'queued',
       queue: [],
-      grabs: []
+      grabs: [],
+      grabOnSearch: false
+    })
+    await owner`DELETE FROM search_request`
+  }
+})
+
+test('a release Radarr grabs while the search is being submitted still counts', async () => {
+  stub.movies = [
+    {
+      id: 501,
+      title: 'Doodlebug',
+      year: 1997,
+      runtime: 3,
+      hasFile: false,
+      monitored: true,
+      isAvailable: true,
+      tags: [],
+      genres: [],
+      overview: '',
+      status: 'released'
+    }
+  ]
+  stub.grabOnSearch = true
+  stub.commandStatus = 'completed'
+  try {
+    const fixture = await authFixture()
+    const { cookie } = await signInFixture(fixture)
+    assert.equal((await postSearch(cookie, { movieIds: [501] })).status, 200)
+    const response = await getStatus(cookie)
+    assert.equal(response.status, 200, await response.clone().text())
+    // The download has already left the queue: it must read as grabbed, not
+    // "No release found".
+    assert.equal((await response.json()).statuses['501'].state, 'grabbed')
+  } finally {
+    Object.assign(stub, {
+      movies: [],
+      commandStatus: 'queued',
+      queue: [],
+      grabs: [],
+      grabOnSearch: false
     })
     await owner`DELETE FROM search_request`
   }

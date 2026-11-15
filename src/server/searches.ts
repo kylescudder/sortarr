@@ -10,9 +10,12 @@ const STATUS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
 export async function recordSearch(
   userId: string,
   commandId: number,
-  movieIds: number[]
+  movieIds: number[],
+  createdAt: Date
 ) {
-  await db.insert(searchRequest).values({ userId, commandId, movieIds })
+  await db
+    .insert(searchRequest)
+    .values({ userId, commandId, movieIds, createdAt })
 }
 
 export async function recentSearches(

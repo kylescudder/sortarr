@@ -19,7 +19,8 @@ const movie = (id: number, runtime: number | null): Movie => ({
   tags: [],
   genres: [],
   overview: '',
-  status: 'released'
+  status: 'released',
+  hasPoster: false
 })
 test('unknown durations sort last in both numeric directions', () => {
   const movies = [movie(1, null), movie(2, 90), movie(3, 3)]

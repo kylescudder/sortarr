@@ -18,6 +18,7 @@ import { Route as ApiSearchRouteImport } from './routes/api/search'
 import { Route as ApiStatusRouteImport } from './routes/api/status'
 import { Route as AuthPathRouteImport } from './routes/auth.$path'
 import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
+import { Route as ApiPosterIdRouteImport } from './routes/api/poster.$id'
 import { Route as ApiProfileAvatarRouteImport } from './routes/api.profile.avatar'
 
 const IndexRoute = IndexRouteImport.update({
@@ -65,6 +66,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPosterIdRoute = ApiPosterIdRouteImport.update({
+  id: '/api/poster/$id',
+  path: '/api/poster/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiProfileAvatarRoute = ApiProfileAvatarRouteImport.update({
   id: '/avatar',
   path: '/avatar',
@@ -81,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/api/status': typeof ApiStatusRoute
   '/auth/$path': typeof AuthPathRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/poster/$id': typeof ApiPosterIdRoute
   '/api/profile/avatar': typeof ApiProfileAvatarRoute
 }
 export interface FileRoutesByTo {
@@ -93,6 +100,7 @@ export interface FileRoutesByTo {
   '/api/status': typeof ApiStatusRoute
   '/auth/$path': typeof AuthPathRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/poster/$id': typeof ApiPosterIdRoute
   '/api/profile/avatar': typeof ApiProfileAvatarRoute
 }
 export interface FileRoutesById {
@@ -106,6 +114,7 @@ export interface FileRoutesById {
   '/api/status': typeof ApiStatusRoute
   '/auth/$path': typeof AuthPathRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/poster/$id': typeof ApiPosterIdRoute
   '/api/profile/avatar': typeof ApiProfileAvatarRoute
 }
 export interface FileRouteTypes {
@@ -120,6 +129,7 @@ export interface FileRouteTypes {
     | '/api/status'
     | '/auth/$path'
     | '/api/auth/$'
+    | '/api/poster/$id'
     | '/api/profile/avatar'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -132,6 +142,7 @@ export interface FileRouteTypes {
     | '/api/status'
     | '/auth/$path'
     | '/api/auth/$'
+    | '/api/poster/$id'
     | '/api/profile/avatar'
   id:
     | '__root__'
@@ -144,6 +155,7 @@ export interface FileRouteTypes {
     | '/api/status'
     | '/auth/$path'
     | '/api/auth/$'
+    | '/api/poster/$id'
     | '/api/profile/avatar'
   fileRoutesById: FileRoutesById
 }
@@ -157,6 +169,7 @@ export interface RootRouteChildren {
   ApiStatusRoute: typeof ApiStatusRoute
   AuthPathRoute: typeof AuthPathRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiPosterIdRoute: typeof ApiPosterIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -224,6 +237,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/poster/$id': {
+      id: '/api/poster/$id'
+      path: '/api/poster/$id'
+      fullPath: '/api/poster/$id'
+      preLoaderRoute: typeof ApiPosterIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/profile/avatar': {
       id: '/api/profile/avatar'
       path: '/avatar'
@@ -256,6 +276,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiStatusRoute: ApiStatusRoute,
   AuthPathRoute: AuthPathRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiPosterIdRoute: ApiPosterIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
