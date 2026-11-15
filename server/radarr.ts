@@ -2,6 +2,11 @@ import { z } from 'zod'
 import type { Library } from '../shared/movies'
 import { readOriginEnv, readRadarrEnv } from './env'
 import { ApiError } from './errors'
+import {
+  deriveStatuses,
+  type CommandState,
+  type SearchRecord
+} from '../shared/status'
 export { ApiError }
 const movieSchema = z.object({
   id: z.number().int().positive(),
@@ -16,7 +21,11 @@ const movieSchema = z.object({
   overview: z.string().default(''),
   status: z.string().default('unknown')
 })
-async function radarr(path: string, options?: RequestInit) {
+async function radarr(
+  path: string,
+  options?: RequestInit,
+  { missingOk = false } = {}
+) {
   const { RADARR_URL, RADARR_API_KEY } = readRadarrEnv()
   const url = new URL(`${RADARR_URL}/api/v3/${path}`)
   let response: Response
@@ -35,6 +44,7 @@ async function radarr(path: string, options?: RequestInit) {
       'Could not reach Radarr. Check its address and the server network connection.'
     )
   }
+  if (missingOk && response.status === 404) return null
   if (!response.ok)
     throw new ApiError(
       response.status === 401 || response.status === 403
@@ -117,12 +127,83 @@ export async function search(request: Request) {
     return {
       commandId: command.data.id,
       status: command.data.status,
-      count: ids.length
+      count: ids.length,
+      movieIds: ids
     }
   } finally {
     searchInProgress = false
   }
 }
+const queueSchema = z.object({
+  records: z.array(
+    z.object({
+      movieId: z.number().nullable().optional(),
+      status: z.string().nullable().optional(),
+      trackedDownloadStatus: z.string().nullable().optional(),
+      trackedDownloadState: z.string().nullable().optional(),
+      size: z.number().nullable().optional(),
+      sizeleft: z.number().nullable().optional(),
+      timeleft: z.string().nullable().optional(),
+      errorMessage: z.string().nullable().optional(),
+      statusMessages: z
+        .array(
+          z.object({
+            title: z.string().nullable().optional(),
+            messages: z.array(z.string()).nullable().optional()
+          })
+        )
+        .nullable()
+        .optional()
+    })
+  )
+})
+const grabSchema = z.array(z.object({ movieId: z.number(), date: z.string() }))
+const commandSchema = z.object({ status: z.string() })
+// Searches finish within minutes; older commands are treated as finished
+// rather than asking Radarr about every ticket from the past week.
+const COMMAND_LOOKBACK_MS = 6 * 60 * 60 * 1000
+
+async function commandState(id: number): Promise<CommandState> {
+  const body = await radarr(`command/${id}`, undefined, { missingOk: true })
+  if (body === null) return 'gone'
+  const parsed = commandSchema.safeParse(body)
+  return parsed.success ? (parsed.data.status as CommandState) : 'gone'
+}
+
+// What Radarr is doing for films in its queue and for recent Sortarr searches.
+export async function activity(searches: SearchRecord[], now = Date.now()) {
+  const oldest = searches.reduce(
+    (min, s) => Math.min(min, Date.parse(s.createdAt)),
+    now
+  )
+  const recent = searches.filter(
+    (s) => now - Date.parse(s.createdAt) < COMMAND_LOOKBACK_MS
+  )
+  const [queue, grabs, commands] = await Promise.all([
+    radarr('queue?page=1&pageSize=1000&includeMovie=false'),
+    searches.length
+      ? radarr(
+          `history/since?date=${encodeURIComponent(new Date(oldest).toISOString())}&eventType=grabbed`
+        )
+      : [],
+    Promise.all(
+      recent.map(async (s) => [s.commandId, await commandState(s.commandId)])
+    )
+  ])
+  const parsedQueue = queueSchema.safeParse(queue)
+  const parsedGrabs = grabSchema.safeParse(grabs)
+  if (!parsedQueue.success || !parsedGrabs.success)
+    throw new ApiError(
+      'Radarr returned unexpected queue or history data. Check your Radarr version.'
+    )
+  return deriveStatuses({
+    queue: parsedQueue.data.records,
+    searches,
+    commands: Object.fromEntries(commands),
+    grabs: parsedGrabs.data
+  })
+}
+
 export async function respond(action: () => Promise<unknown>) {
   try {
     return Response.json(await action(), {

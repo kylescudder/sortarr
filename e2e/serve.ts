@@ -94,15 +94,31 @@ const movies = [
 let mode = ''
 let commands: unknown[] = []
 let requests: string[] = []
+// Search progress: what Radarr reports for command 42, its queue and history.
+let commandStatus = 'started'
+let queue: unknown[] = []
+let grabs: unknown[] = []
 const mock = Bun.serve({
   hostname: '127.0.0.1',
   port: 43211,
   async fetch(request) {
     const pathname = new URL(request.url).pathname
     if (pathname === '/control' && request.method === 'POST') {
-      mode = (await request.json()).mode || ''
+      const control = await request.json()
+      if ('progress' in control) {
+        // Change only Radarr's progress, keeping the rest of the fixture.
+        commandStatus = control.progress.commandStatus ?? commandStatus
+        queue = control.progress.queue ?? queue
+        grabs = control.progress.grabs ?? grabs
+        if (control.progress.mode !== undefined) mode = control.progress.mode
+        return Response.json({ ok: true })
+      }
+      mode = control.mode || ''
       commands = []
       requests = []
+      commandStatus = 'started'
+      queue = []
+      grabs = []
       return Response.json({ ok: true })
     }
     if (pathname === '/control') return Response.json({ commands, requests })
@@ -123,6 +139,11 @@ const mock = Bun.serve({
       commands.push(await request.json())
       return Response.json({ id: 42, status: 'queued' }, { status: 201 })
     }
+    if (pathname === '/radarr/api/v3/command/42')
+      return Response.json({ id: 42, status: commandStatus })
+    if (pathname === '/radarr/api/v3/queue')
+      return Response.json({ records: queue })
+    if (pathname === '/radarr/api/v3/history/since') return Response.json(grabs)
     return new Response(null, { status: 404 })
   }
 })

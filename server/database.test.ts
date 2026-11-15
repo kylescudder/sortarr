@@ -66,6 +66,14 @@ let application: { fetch(request: Request): Promise<Response> }
 let radarr: ReturnType<typeof Bun.serve> | undefined
 const radarrRequests: string[] = []
 const radarrKey = 'fixture-radarr-key'
+// Mutable stub state for the search-progress test; everything else sees an
+// empty library and queue.
+const stub = {
+  movies: [] as object[],
+  commandStatus: 'queued',
+  queue: [] as object[],
+  grabs: [] as object[]
+}
 const authOrigin = 'https://sortarr.auth.test'
 const allowedEmails = ['member@example.com', 'second@example.com']
 const originalEnv = Object.fromEntries(
@@ -117,8 +125,15 @@ beforeAll(async () => {
       radarrRequests.push(pathname)
       if (request.headers.get('x-api-key') !== radarrKey)
         return new Response(null, { status: 401 })
-      if (pathname === '/api/v3/movie' || pathname === '/api/v3/tag')
-        return Response.json([])
+      if (pathname === '/api/v3/movie') return Response.json(stub.movies)
+      if (pathname === '/api/v3/tag') return Response.json([])
+      if (pathname === '/api/v3/command' && request.method === 'POST')
+        return Response.json({ id: 9001, status: 'queued' }, { status: 201 })
+      if (pathname === '/api/v3/command/9001')
+        return Response.json({ id: 9001, status: stub.commandStatus })
+      if (pathname === '/api/v3/queue')
+        return Response.json({ records: stub.queue })
+      if (pathname === '/api/v3/history/since') return Response.json(stub.grabs)
       return new Response('Not found', { status: 404 })
     }
   })
@@ -145,6 +160,7 @@ beforeAll(async () => {
       .Route,
     '/api/library': (await import('../src/routes/api/library')).Route,
     '/api/search': (await import('../src/routes/api/search')).Route,
+    '/api/status': (await import('../src/routes/api/status')).Route,
     '/api/health': (await import('../src/routes/api/health')).Route
   }
   application = {
@@ -186,6 +202,10 @@ const getLibrary = (cookie = '') =>
   application.fetch(
     new Request(authOrigin + '/api/library', { headers: { Cookie: cookie } })
   )
+const getStatus = (cookie = '') =>
+  application.fetch(
+    new Request(authOrigin + '/api/status', { headers: { Cookie: cookie } })
+  )
 const postSearch = (
   cookie = '',
   body: unknown = { movieIds: [1] },
@@ -207,7 +227,7 @@ test('owner migrations are repeatable and preserve their journal', async () => {
   assert.equal(await migrate(), 0, 'Migration failed')
   const [journal] =
     await owner`SELECT count(*)::int AS applied FROM drizzle.__drizzle_migrations`
-  assert.equal(journal.applied, 1)
+  assert.equal(journal.applied, 2)
 })
 
 test('restricted runtime supports CRUD on the auth tables while DDL, journals and other databases are denied', async () => {
@@ -223,6 +243,7 @@ test('restricted runtime supports CRUD on the auth tables while DDL, journals an
       'auth_session',
       'auth_user',
       'auth_verification',
+      'search_request',
       'user_profile'
     ]
   )
@@ -314,6 +335,92 @@ test('Radarr routes accept a verified member and refuse anyone else before conta
   // The stub has no missing films, so this passes authorization and then
   // refuses to search a film that is no longer missing.
   assert.equal((await postSearch(cookie)).status, 409)
+})
+
+test('searches are recorded for the member and their progress is reported from Radarr', async () => {
+  const contacted = radarrRequests.length
+  assert.equal((await getStatus('')).status, 401)
+  assert.equal(
+    (await getStatus('sortarr-auth.session_token=forged')).status,
+    401
+  )
+  assert.equal(radarrRequests.length, contacted, 'Radarr was contacted')
+  stub.movies = [
+    {
+      id: 501,
+      title: 'Doodlebug',
+      year: 1997,
+      runtime: 3,
+      hasFile: false,
+      monitored: true,
+      isAvailable: true,
+      tags: [],
+      genres: [],
+      overview: '',
+      status: 'released'
+    }
+  ]
+  stub.commandStatus = 'started'
+  try {
+    const fixture = await authFixture()
+    const { cookie, user } = await signInFixture(fixture)
+    const searched = await postSearch(cookie, { movieIds: [501] })
+    assert.equal(searched.status, 200, await searched.clone().text())
+    assert.deepEqual(await searched.json(), {
+      commandId: 9001,
+      status: 'queued',
+      count: 1
+    })
+    const rows = await owner`
+      SELECT user_id, command_id, movie_ids FROM search_request`
+    assert.deepEqual(
+      rows.map((r) => [r.user_id, r.command_id, r.movie_ids]),
+      [[user.id, 9001, [501]]]
+    )
+    const statusOf = async () => {
+      const response = await getStatus(cookie)
+      assert.equal(response.status, 200, await response.clone().text())
+      assert.equal(response.headers.get('Cache-Control'), 'no-store')
+      return (await response.json()).statuses['501']
+    }
+    assert.equal((await statusOf()).state, 'searching')
+    stub.queue = [
+      {
+        movieId: 501,
+        status: 'downloading',
+        trackedDownloadStatus: 'ok',
+        trackedDownloadState: 'downloading',
+        size: 1000,
+        sizeleft: 250,
+        timeleft: '00:04:00'
+      }
+    ]
+    assert.deepEqual(await statusOf(), {
+      state: 'downloading',
+      progress: 0.75,
+      minutesLeft: 4,
+      note: null
+    })
+    stub.queue = []
+    stub.commandStatus = 'completed'
+    assert.equal((await statusOf()).state, 'not-found')
+    stub.grabs = [{ movieId: 501, date: new Date().toISOString() }]
+    assert.equal((await statusOf()).state, 'grabbed')
+    // Removing the member removes their tickets with them.
+    await owner`DELETE FROM auth_user WHERE id = ${user.id}`
+    assert.equal(
+      (await owner`SELECT count(*)::int AS n FROM search_request`)[0].n,
+      0
+    )
+  } finally {
+    Object.assign(stub, {
+      movies: [],
+      commandStatus: 'queued',
+      queue: [],
+      grabs: []
+    })
+    await owner`DELETE FROM search_request`
+  }
 })
 
 test('application pool reuses connections, retires idle backends and reconnects', async () => {

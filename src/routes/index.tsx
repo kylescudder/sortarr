@@ -1,8 +1,16 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { CircleAlertIcon } from 'lucide-react'
-import { lazy, Suspense, useState, type ReactNode } from 'react'
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode
+} from 'react'
 import { filterMovies, type Filters, type Library } from '../../shared/movies'
+import { ACTIVE_STATES, type StatusMap } from '../../shared/status'
 import { Marquee } from '@/components/picture-house/marquee'
 import { Reel } from '@/components/picture-house/reel'
 import { Ticket } from '@/components/picture-house/ticket'
@@ -90,10 +98,38 @@ function Backlog() {
   const [confirming, setConfirming] = useState(false)
   const [notice, setNotice] = useState('')
 
+  const queryClient = useQueryClient()
   const library = useQuery({
     queryKey: ['library'],
     queryFn: () => api<Library>('/api/library')
   })
+  // What Radarr is doing, read live so it survives a refresh and shows the
+  // same on every device: every 5 s while anything is moving, else every minute.
+  const status = useQuery({
+    queryKey: ['status'],
+    queryFn: () =>
+      api<{ statuses: StatusMap; checkedAt: string }>('/api/status'),
+    refetchInterval: (query) =>
+      Object.values(query.state.data?.statuses ?? {}).some((s) =>
+        ACTIVE_STATES.includes(s.state)
+      )
+        ? 5000
+        : 60000
+  })
+  const statuses = status.data?.statuses ?? {}
+  const activeIds = Object.entries(statuses)
+    .filter(([, s]) => ACTIVE_STATES.includes(s.state))
+    .map(([id]) => id)
+  const active = activeIds.join(',')
+  // When a film stops moving (usually because Radarr imported it), reload the
+  // backlog so it drops off the list.
+  const previousActive = useRef<string[]>([])
+  useEffect(() => {
+    const now = active ? active.split(',') : []
+    if (previousActive.current.some((id) => !now.includes(id)))
+      void queryClient.invalidateQueries({ queryKey: ['library'] })
+    previousActive.current = now
+  }, [active, queryClient])
   const search = useMutation({
     mutationFn: (movieIds: number[]) =>
       api<SearchReceipt>('/api/search', {
@@ -104,9 +140,10 @@ function Backlog() {
     onMutate: () => setNotice(''),
     onSuccess: (result) => {
       setNotice(
-        `Search accepted for ${result.count} film${result.count === 1 ? '' : 's'}. Radarr command #${result.commandId}. Check Radarr Activity for progress; downloads are not guaranteed.`
+        `Search accepted for ${result.count} film${result.count === 1 ? '' : 's'}. Radarr command #${result.commandId}. Progress shows on each film below; downloads are not guaranteed.`
       )
       setSelected([])
+      void queryClient.invalidateQueries({ queryKey: ['status'] })
     },
     onSettled: () => setConfirming(false)
   })
@@ -118,7 +155,12 @@ function Backlog() {
   const visible = filterMovies(data?.movies ?? [], filters)
   const unknown = data?.movies.filter((m) => m.runtime === null).length ?? 0
   const chosen = visible.filter((m) => selected.includes(m.id))
-  const feature = visible[0]
+  // The marquee features the shortest film Radarr isn't already working on.
+  const feature =
+    visible.find((m) => {
+      const state = statuses[m.id]?.state
+      return !state || state === 'not-found' || state === 'attention'
+    }) ?? visible[0]
   const tagLabel = (id: number) => data?.tags.find((t) => t.id === id)?.label
 
   function update(next: Partial<Filters>) {
@@ -308,7 +350,7 @@ function Backlog() {
               Reading Radarr…
             </span>
           ) : (
-            `${visible.length} films shown`
+            `${visible.length} films shown${activeIds.length ? `, ${activeIds.length} searching or downloading` : ''}`
           )}
         </p>
       </section>
@@ -349,6 +391,8 @@ function Backlog() {
           limitReached={selected.length >= MAX_SELECTION}
           disabled={search.isPending}
           onToggle={toggle}
+          statuses={statuses}
+          now={status.data ? Date.parse(status.data.checkedAt) : undefined}
         />
       )}
 
