@@ -7,4 +7,3 @@ dist/
 artifacts/
 test-results/
 playwright-report/
-src/routeTree.gen.ts

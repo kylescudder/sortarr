@@ -1,47 +1,84 @@
-# Sortarr (working name)
+# Sortarr
 
-A self-hosted Radarr backlog browser: find missing films, sort by runtime and search selected batches. No public hostname configured. Unrelated to the existing Jaredharper1/Sortarr project.
+A Radarr backlog browser for the Forge arr stack: list the films you still need,
+shortest first, and send selected batches to Radarr to search. Public hostname:
+**sortarr.thescudders.org** (behind the stack's Cloudflare Access app). Unrelated
+to the Jaredharper1/Sortarr project.
 
 ## Development
 
-Use Bun 1.4.2 (the installed version, also used in CI and Docker).
+Use Bun 1.4.4. Install the committed dependencies with
+`bun install --frozen-lockfile`. This also installs the pre-commit hook.
+
+Copy `.env.example` to `.env` and set `RADARR_URL` and `RADARR_API_KEY`; see
+[Runtime configuration](#runtime-configuration). There is no database: Radarr
+is the source of truth.
 
 ```sh
-bun install
-cp .env.example .env
-# Set RADARR_URL and RADARR_API_KEY in .env
 bun run dev
 ```
 
-Open http://127.0.0.1:3210. The API key stays on the server. No database is required. This initial version has no user accounts: keep it local or put it behind your existing authenticated proxy before allowing remote access.
+Open **http://127.0.0.1:3210**. The API key stays on the server.
 
 ## Checks
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Run `bun run build`, `bun run typecheck`, `bun run lint`, `bun run format:check`, `bun run test`, then `bun run test:e2e`. The first build generates TanStack Router's route types. Install Chromium once with `bunx --no-install playwright install chromium`.
+See [CONTRIBUTING.md](CONTRIBUTING.md). In short:
 
-The permanent Playwright suite uses a fake Radarr at the HTTP boundary and the production app on ports 43211 and 43210. It never contacts your real Radarr or downloads media. Reports go to ignored `playwright-report`, `test-results`, and `artifacts` directories.
+```sh
+bun run format:check
+bun run lint
+bun run typecheck
+bun run test
+bun run build
+bun run test:e2e   # after the build; install Chromium once with bunx --no-install playwright install chromium
+```
 
-## Database
-
-None. Radarr remains the source of truth. Filters and selections are held in the browser until reload; credentials are environment variables.
+The Playwright suite runs the production build against a fake Radarr on ports
+43210 and 43211. It never contacts a real Radarr or downloads anything.
 
 ## Deployment
 
-See [deploy/README.md](deploy/README.md). No automatic production deployment is configured.
+Sortarr runs as a service in the udms Compose stack on Forge
+(`kylescudder/docker-compose`, `udms/compose/udms/sortarr.yml`), on the
+`udms_default` network next to Radarr. It is not a deploy-core app.
+
+Merging to `main` runs CI, then publishes a multi-platform image to
+`ghcr.io/kylescudder/sortarr` tagged `main` and `sha-<commit>`. To roll out a
+release, run this on Forge from `udms/`:
+
+```sh
+docker --context colima compose pull sortarr
+docker --context colima compose up -d sortarr
+```
+
+Roll back by pinning `image:` to a previous `sha-<commit>` tag. The
+`forge-udms` Cloudflare Tunnel routes `sortarr.thescudders.org` to
+`sortarr:3210`. The `Forge UDMS arr stack` Access application protects it, so
+Sortarr has no login of its own and must never publish a host port.
+
+## Searching in Radarr
+
+Only movies with `hasFile: false` are listed. By default the list shows
+monitored, available films with known runtimes, shortest first. Runtime comes
+from Radarr's metadata, not Emby's file duration. Unknown, zero and negative
+runtimes are listed separately and sort last. To fill in missing runtimes,
+refresh the film's metadata in Radarr.
+
+Select up to 20 films, choose **Search selected in Radarr**, then confirm. The
+server re-reads the library to reject films downloaded in the meantime, then
+sends `MoviesSearch` to Radarr. A receipt means Radarr accepted the search. It
+does not mean a download started; check Radarr's Activity page. Searches must
+come from the app's own origin (`APP_ORIGIN` in production).
 
 ## Runtime configuration
 
-| Variable       | Purpose                                                   | Default                           |
-| -------------- | --------------------------------------------------------- | --------------------------------- |
-| RADARR_URL     | Radarr base URL, including any URL base such as `/radarr` | Required                          |
-| RADARR_API_KEY | Radarr Settings → General → Security API key              | Required                          |
-| HOST           | Production bind address                                   | `127.0.0.1` (`0.0.0.0` in Docker) |
-| PORT           | Production port                                           | `3210`                            |
+| Variable           | Required   | Purpose                                                                               |
+| ------------------ | ---------- | ------------------------------------------------------------------------------------- |
+| `RADARR_URL`       | yes        | Radarr base URL, including any URL base. `http://radarr:7878` on Forge                |
+| `RADARR_API_KEY`   | yes        | From Radarr → Settings → General → Security                                           |
+| `APP_ORIGIN`       | production | Public https origin that searches must come from: `https://sortarr.thescudders.org`   |
+| `HOST`             | no         | Bind address: `127.0.0.1` by default, `0.0.0.0` in the image                          |
+| `PORT`             | no         | `3210`                                                                                |
+| `SORTARR_REVISION` | no         | Set by the image build. Reported by `/api/health` and the `X-Sortarr-Revision` header |
 
-## Backlog workflow
-
-Only movies with `hasFile: false` are listed. The default shows monitored, available films with known runtimes, shortest first. Change the monitoring and availability filters to include other missing films. Runtime is Radarr's metadata in minutes, not Emby's file duration. Unknown, zero and negative runtimes appear separately and sort last in either direction. Refresh metadata in Radarr if runtimes are missing; this version does not enrich from TMDb or add new movies.
-
-Use title search, runtime ceilings, or Radarr tags to narrow the backlog. Import-list membership is not supplied by the movie API; use tags assigned by the import list. Select at most 20 films, choose **Search selected in Radarr**, then confirm. The server rereads the library to reject already-downloaded selections and submits `MoviesSearch` through `/api/v3/command`. A receipt means Radarr accepted the search; it does not prove a download started or completed. Check Radarr Activity for results. Sorting here does not control downloader priority. Unmonitored movies can be explicitly searched if you include and select them.
-
-Runtimes rank viewing effort. They do not measure release availability, download speed or file size. There is no automatic queue, Emby integration, playback tracking or release probing in this version.
+Errors name a missing variable, never its value. Never commit `.env`.

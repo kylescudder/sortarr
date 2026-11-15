@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { revision } from './revision'
 const root = path.resolve('dist/client')
 const app = (await import(path.resolve('dist/server/server.js'))).default as {
   fetch(request: Request): Promise<Response>
@@ -22,7 +23,12 @@ const server = Bun.serve({
           return new Response(request.method === 'HEAD' ? null : file, {
             headers: {
               'Content-Type': file.type,
-              'X-Content-Type-Options': 'nosniff'
+              'X-Content-Type-Options': 'nosniff',
+              'X-Sortarr-Revision': revision(),
+              // Vite fingerprints everything under /assets.
+              'Cache-Control': url.pathname.startsWith('/assets/')
+                ? 'public, max-age=31536000, immutable'
+                : 'no-cache'
             }
           })
       }
@@ -31,6 +37,7 @@ const server = Bun.serve({
     response.headers.set('X-Content-Type-Options', 'nosniff')
     response.headers.set('Referrer-Policy', 'same-origin')
     response.headers.set('Cache-Control', 'no-store')
+    response.headers.set('X-Sortarr-Revision', revision())
     return response
   }
 })

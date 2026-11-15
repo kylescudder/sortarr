@@ -1,4 +1,9 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
+// Radix Select renders a combobox button and a listbox, not a native <select>.
+async function choose(page: Page, label: string, option: string) {
+  await page.getByRole('combobox', { name: label, exact: true }).click()
+  await page.getByRole('option', { name: option, exact: true }).click()
+}
 test.beforeEach(async ({ request }) => {
   await request.post('http://127.0.0.1:43211/control', { data: { mode: '' } })
 })
@@ -14,17 +19,13 @@ test('finds the shortest missing films and searches a selected batch', async ({
   await expect(
     page.getByText('Already Downloaded', { exact: true })
   ).toHaveCount(0)
-  await page
-    .getByRole('combobox', { name: 'Length', exact: true })
-    .selectOption('20')
+  await choose(page, 'Length', '20 minutes or less')
   await expect(rows).toHaveCount(2)
-  await page
-    .getByRole('combobox', { name: 'Tag', exact: true })
-    .selectOption('1')
+  await choose(page, 'Tag', 'Director shorts')
   await page.getByLabel('Select Doodlebug', { exact: true }).check()
   await page.getByRole('button', { name: 'Search selected in Radarr' }).click()
   await expect(
-    page.getByRole('region', { name: 'Confirm search' })
+    page.getByRole('alertdialog', { name: 'Search for 1 film?' })
   ).toContainText('automatically')
   expect(
     (await (await request.get('http://127.0.0.1:43211/control')).json())
@@ -62,6 +63,12 @@ test('separates unknown runtimes and filters title, availability and monitoring'
   await page
     .getByRole('button', { name: 'Unknown runtime (1)', exact: true })
     .click()
+  await expect(
+    page.getByRole('button', { name: 'Unknown runtime (1)', exact: true })
+  ).toHaveAttribute('aria-pressed', 'true')
+  await expect(
+    page.getByRole('button', { name: 'Known runtime', exact: true })
+  ).toHaveAttribute('aria-pressed', 'false')
   await expect(page.locator('tbody tr')).toHaveCount(1)
   await expect(page.locator('tbody')).toContainText('Unknown Length')
   await expect(
@@ -75,9 +82,7 @@ test('separates unknown runtimes and filters title, availability and monitoring'
   await page.getByLabel('Monitored only').uncheck()
   await page.getByLabel('Available according to Radarr').uncheck()
   await expect(page.locator('tbody tr')).toHaveCount(6)
-  await page
-    .getByRole('combobox', { name: 'Sort by', exact: true })
-    .selectOption('longest')
+  await choose(page, 'Sort by', 'Longest first')
   await expect(page.locator('tbody tr').first()).toContainText('Following')
   await expect(page.locator('tbody tr').last()).toContainText('Unknown Length')
   await page.getByLabel('Find a film').fill('nothing matches')
