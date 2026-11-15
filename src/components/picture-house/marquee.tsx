@@ -1,4 +1,5 @@
 import { RefreshCwIcon } from 'lucide-react'
+import type { ReactNode } from 'react'
 import type { Movie } from '../../../shared/movies'
 import { Spinner } from '@/components/ui/spinner'
 
@@ -9,7 +10,8 @@ export function Marquee({
   busy,
   picked,
   onPick,
-  onRefresh
+  onRefresh,
+  menu
 }: {
   feature: Movie | undefined
   remaining: number | undefined
@@ -18,6 +20,7 @@ export function Marquee({
   picked: boolean
   onPick: () => void
   onRefresh: () => void
+  menu?: ReactNode
 }) {
   return (
     <section
@@ -47,6 +50,7 @@ export function Marquee({
             )}
             {loading ? 'Connecting…' : 'Refresh library'}
           </button>
+          {menu}
         </div>
         <div>
           <p className='font-display text-xl font-extrabold tracking-[0.14em] sm:text-[26px]'>

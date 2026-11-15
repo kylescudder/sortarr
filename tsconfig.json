@@ -18,6 +18,7 @@
   "include": [
     "src",
     "server",
+    "client",
     "shared",
     "scripts/*.ts",
     "tests",

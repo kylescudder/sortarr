@@ -10,13 +10,23 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiLibraryRouteImport } from './routes/api/library'
+import { Route as ApiProfileRouteImport } from './routes/api.profile'
 import { Route as ApiSearchRouteImport } from './routes/api/search'
+import { Route as AuthPathRouteImport } from './routes/auth.$path'
+import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
+import { Route as ApiProfileAvatarRouteImport } from './routes/api.profile.avatar'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
@@ -29,44 +39,111 @@ const ApiLibraryRoute = ApiLibraryRouteImport.update({
   path: '/api/library',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiProfileRoute = ApiProfileRouteImport.update({
+  id: '/api/profile',
+  path: '/api/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSearchRoute = ApiSearchRouteImport.update({
   id: '/api/search',
   path: '/api/search',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthPathRoute = AuthPathRouteImport.update({
+  id: '/auth/$path',
+  path: '/auth/$path',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
+  id: '/api/auth/$',
+  path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProfileAvatarRoute = ApiProfileAvatarRouteImport.update({
+  id: '/avatar',
+  path: '/avatar',
+  getParentRoute: () => ApiProfileRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/profile': typeof ProfileRoute
   '/api/health': typeof ApiHealthRoute
   '/api/library': typeof ApiLibraryRoute
+  '/api/profile': typeof ApiProfileRouteWithChildren
   '/api/search': typeof ApiSearchRoute
+  '/auth/$path': typeof AuthPathRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/profile/avatar': typeof ApiProfileAvatarRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/profile': typeof ProfileRoute
   '/api/health': typeof ApiHealthRoute
   '/api/library': typeof ApiLibraryRoute
+  '/api/profile': typeof ApiProfileRouteWithChildren
   '/api/search': typeof ApiSearchRoute
+  '/auth/$path': typeof AuthPathRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/profile/avatar': typeof ApiProfileAvatarRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/profile': typeof ProfileRoute
   '/api/health': typeof ApiHealthRoute
   '/api/library': typeof ApiLibraryRoute
+  '/api/profile': typeof ApiProfileRouteWithChildren
   '/api/search': typeof ApiSearchRoute
+  '/auth/$path': typeof AuthPathRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/profile/avatar': typeof ApiProfileAvatarRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/health' | '/api/library' | '/api/search'
+  fullPaths:
+    | '/'
+    | '/profile'
+    | '/api/health'
+    | '/api/library'
+    | '/api/profile'
+    | '/api/search'
+    | '/auth/$path'
+    | '/api/auth/$'
+    | '/api/profile/avatar'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/health' | '/api/library' | '/api/search'
-  id: '__root__' | '/' | '/api/health' | '/api/library' | '/api/search'
+  to:
+    | '/'
+    | '/profile'
+    | '/api/health'
+    | '/api/library'
+    | '/api/profile'
+    | '/api/search'
+    | '/auth/$path'
+    | '/api/auth/$'
+    | '/api/profile/avatar'
+  id:
+    | '__root__'
+    | '/'
+    | '/profile'
+    | '/api/health'
+    | '/api/library'
+    | '/api/profile'
+    | '/api/search'
+    | '/auth/$path'
+    | '/api/auth/$'
+    | '/api/profile/avatar'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ProfileRoute: typeof ProfileRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiLibraryRoute: typeof ApiLibraryRoute
+  ApiProfileRoute: typeof ApiProfileRouteWithChildren
   ApiSearchRoute: typeof ApiSearchRoute
+  AuthPathRoute: typeof AuthPathRoute
+  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -76,6 +153,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/health': {
@@ -92,6 +176,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiLibraryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/profile': {
+      id: '/api/profile'
+      path: '/api/profile'
+      fullPath: '/api/profile'
+      preLoaderRoute: typeof ApiProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/search': {
       id: '/api/search'
       path: '/api/search'
@@ -99,14 +190,51 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSearchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/$path': {
+      id: '/auth/$path'
+      path: '/auth/$path'
+      fullPath: '/auth/$path'
+      preLoaderRoute: typeof AuthPathRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/profile/avatar': {
+      id: '/api/profile/avatar'
+      path: '/avatar'
+      fullPath: '/api/profile/avatar'
+      preLoaderRoute: typeof ApiProfileAvatarRouteImport
+      parentRoute: typeof ApiProfileRoute
+    }
   }
 }
 
+interface ApiProfileRouteChildren {
+  ApiProfileAvatarRoute: typeof ApiProfileAvatarRoute
+}
+
+const ApiProfileRouteChildren: ApiProfileRouteChildren = {
+  ApiProfileAvatarRoute: ApiProfileAvatarRoute,
+}
+
+const ApiProfileRouteWithChildren = ApiProfileRoute._addFileChildren(
+  ApiProfileRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ProfileRoute: ProfileRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiLibraryRoute: ApiLibraryRoute,
+  ApiProfileRoute: ApiProfileRouteWithChildren,
   ApiSearchRoute: ApiSearchRoute,
+  AuthPathRoute: AuthPathRoute,
+  ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

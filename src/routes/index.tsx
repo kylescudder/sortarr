@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 import { CircleAlertIcon } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { lazy, Suspense, useState, type ReactNode } from 'react'
 import { filterMovies, type Filters, type Library } from '../../shared/movies'
 import { Marquee } from '@/components/picture-house/marquee'
 import { Reel } from '@/components/picture-house/reel'
@@ -35,8 +35,24 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
+import { getViewer } from '@/lib/viewer'
 
-export const Route = createFileRoute('/')({ component: Backlog })
+const UserMenu = lazy(() =>
+  import('@/components/BetterAuthUserMenu').then((m) => ({
+    default: m.BetterAuthUserMenu
+  }))
+)
+
+export const Route = createFileRoute('/')({
+  // The whole app is for allowlisted members; confirm on the server first.
+  beforeLoad: async ({ location }) => {
+    if (!(await getViewer()))
+      throw redirect({
+        href: `/auth/sign-in?redirectTo=${encodeURIComponent(location.href)}`
+      })
+  },
+  component: Backlog
+})
 
 const MAX_SELECTION = 20
 const defaults: Filters = {
@@ -57,6 +73,11 @@ interface SearchReceipt {
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init)
+  // A session that expired or lost its allowlisting goes back to sign-in.
+  if (response.status === 401) {
+    window.location.assign('/auth/sign-in?redirectTo=%2F')
+    throw new Error('Sign in to use Sortarr.')
+  }
   const result = await response.json().catch(() => ({}))
   if (!response.ok)
     throw new Error(result.error || 'The request failed. Try again.')
@@ -132,6 +153,11 @@ function Backlog() {
           feature && toggle(feature.id, !selected.includes(feature.id))
         }
         onRefresh={refresh}
+        menu={
+          <Suspense fallback={<span className='size-9' />}>
+            <UserMenu />
+          </Suspense>
+        }
       />
 
       <section aria-label='Filters' className='mb-4 flex flex-col gap-4'>
