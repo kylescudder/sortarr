@@ -1,7 +1,16 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+@import '@fontsource/big-shoulders-display/latin-800';
+@import '@fontsource/big-shoulders-display/latin-900';
+@import '@fontsource/instrument-sans/latin-400';
+@import '@fontsource/instrument-sans/latin-500';
+@import '@fontsource/instrument-sans/latin-600';
 
-/* shadcn tokens: slate-blue neutrals with Sortarr's amber accent. */
+/*
+  Scudder Picture House. One motif ties the page together: a 10px dot every
+  26px. It is the marquee bulbs, the sprocket holes that pick a film, and the
+  tear on the ticket. Lamp light means "picked" everywhere.
+*/
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -21,58 +30,53 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-deep: var(--deep);
+  --color-lamp: var(--lamp);
+  --color-glow: var(--glow);
+  --color-board: var(--board);
+  --color-stock: var(--stock);
+  --color-ink: var(--ink);
+  --color-stamp: var(--stamp);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-sans:
-    'Avenir Next', Avenir, ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
-    sans-serif;
+  --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
 }
 
+/* The auditorium is always dark: there is no light theme. */
 :root {
-  --radius: 0.5rem;
-  --background: #eaf0f5;
-  --foreground: #203345;
-  --card: #ffffff;
-  --card-foreground: #203345;
-  --popover: #ffffff;
-  --popover-foreground: #203345;
-  --primary: #203345;
-  --primary-foreground: #ffffff;
-  --secondary: #dbe5ed;
-  --secondary-foreground: #203345;
-  --muted: #e7eff6;
-  --muted-foreground: #5b6f80;
-  --accent: #fbe9d2;
-  --accent-foreground: #7a4106;
-  --destructive: #b42318;
-  --border: #becdd8;
-  --input: #aebfcb;
-  --ring: #bd690b;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #101a24;
-    --foreground: #e6edf3;
-    --card: #172431;
-    --card-foreground: #e6edf3;
-    --popover: #172431;
-    --popover-foreground: #e6edf3;
-    --primary: #f0a14a;
-    --primary-foreground: #1b1206;
-    --secondary: #223344;
-    --secondary-foreground: #e6edf3;
-    --muted: #1d2c3a;
-    --muted-foreground: #9fb1c1;
-    --accent: #3a2a14;
-    --accent-foreground: #f6c98e;
-    --destructive: #f97066;
-    --border: #2c3e50;
-    --input: #3b5064;
-    --ring: #f0a14a;
-  }
+  color-scheme: dark;
+  --radius: 0.625rem;
+  --background: #0f3b39;
+  --foreground: #eef3f1;
+  --card: #092826;
+  --card-foreground: #eef3f1;
+  --popover: #092826;
+  --popover-foreground: #eef3f1;
+  --primary: #e8b04b;
+  --primary-foreground: #092826;
+  --secondary: #164744;
+  --secondary-foreground: #eef3f1;
+  --muted: #164744;
+  --muted-foreground: #8fb0aa;
+  --accent: #23524e;
+  --accent-foreground: #eef3f1;
+  --destructive: #f2867a;
+  --border: #23524e;
+  --input: #2c5a56;
+  --ring: #ffd98a;
+  --deep: #092826;
+  --lamp: #e8b04b;
+  --glow: #ffd98a;
+  --board: #eef3f1;
+  /* Ticket card and inks, after 1960s UK Automaticket roll tickets. */
+  --stock: #d99aab;
+  --ink: #25243f;
+  --stamp: #8e2433;
+  --dot: 10px;
+  --pitch: 26px;
 }
 
 @layer base {
@@ -87,5 +91,155 @@
   input,
   summary {
     touch-action: manipulation;
+  }
+}
+
+@layer components {
+  .bulbs {
+    height: 30px;
+    background: radial-gradient(
+        circle,
+        var(--glow) 0 calc(var(--dot) / 2 - 1px),
+        transparent calc(var(--dot) / 2)
+      )
+      left center / var(--pitch) 100% repeat-x;
+    filter: drop-shadow(0 0 5px rgb(255 217 138 / 0.85));
+  }
+  .letterboard {
+    background:
+      repeating-linear-gradient(
+        transparent 0 46px,
+        rgb(9 40 38 / 0.08) 46px 48px
+      ),
+      var(--board);
+  }
+  /* Sprocket holes: whole holes only, lit when the film is picked. */
+  .sprockets {
+    background:
+      radial-gradient(
+          circle,
+          var(--background) 0 calc(var(--dot) / 2 - 0.5px),
+          transparent calc(var(--dot) / 2)
+        )
+        center / 100% var(--pitch) no-repeat space,
+      var(--deep);
+  }
+  .sprockets[aria-checked='true'] {
+    background:
+      radial-gradient(
+          circle,
+          var(--glow) 0 calc(var(--dot) / 2 - 0.5px),
+          rgb(255 217 138 / 0.35) calc(var(--dot) / 2),
+          transparent calc(var(--dot) - 1px)
+        )
+        center / 100% var(--pitch) no-repeat space,
+      var(--deep);
+  }
+  .leaders::after {
+    content: '';
+    order: 2;
+    flex: 1;
+    height: 3px;
+    align-self: center;
+    opacity: 0.6;
+    background: radial-gradient(circle, var(--ink) 0 1px, transparent 1.4px)
+      left center / 6px 3px repeat-x;
+  }
+  /* Paper grain and fading, multiplied over the printed ticket. */
+  .ticket-stock::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    mix-blend-mode: multiply;
+    opacity: 0.55;
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45  0 0 0 0 .35  0 0 0 0 .38  0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+      radial-gradient(
+        ellipse at 20% 30%,
+        transparent 40%,
+        rgb(120 70 80 / 0.18)
+      ),
+      radial-gradient(
+        ellipse at 85% 80%,
+        transparent 50%,
+        rgb(120 70 80 / 0.14)
+      );
+  }
+  .tear::before {
+    content: '';
+    position: absolute;
+    left: -14px;
+    top: -9px;
+    bottom: -9px;
+    width: 4px;
+    background: radial-gradient(
+        circle,
+        rgb(37 36 63 / 0.55) 0 1.3px,
+        transparent 1.7px
+      )
+      center / 4px 7px repeat-y;
+  }
+}
+
+/* The ticket: torn off a roll on the left, punched where the stub tears. */
+.ticket {
+  --stub: 236px;
+  --torn: polygon(
+    3.6px 0%,
+    0.4px 5%,
+    5.1px 10%,
+    1.2px 15%,
+    6.3px 20%,
+    2.2px 25%,
+    0.6px 30%,
+    4.8px 35%,
+    1.9px 40%,
+    6.8px 45%,
+    0.9px 50%,
+    3.9px 55%,
+    5.9px 60%,
+    1.4px 65%,
+    4.4px 70%,
+    0.3px 75%,
+    5.4px 80%,
+    2.7px 85%,
+    6.1px 90%,
+    1.1px 95%,
+    4.2px 100%,
+    calc(100% - 1.2px) 100%,
+    calc(100% - 0.4px) 50%,
+    calc(100% - 1.6px) 0%
+  );
+  clip-path: var(--torn);
+  -webkit-mask: radial-gradient(
+    circle 9px at calc(100% - var(--stub)) 50%,
+    #0000 97%,
+    #000
+  );
+  mask: radial-gradient(
+    circle 9px at calc(100% - var(--stub)) 50%,
+    #0000 97%,
+    #000
+  );
+}
+@media (max-width: 720px) {
+  .ticket {
+    --stub: 150px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* The one orchestrated moment: the marquee lamps come up on load. */
+  .bulbs {
+    animation: lamps 1.2s steps(6) both;
+  }
+  @keyframes lamps {
+    from {
+      opacity: 0.15;
+    }
+    to {
+      opacity: 1;
+    }
   }
 }

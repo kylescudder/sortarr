@@ -64,7 +64,7 @@ from Radarr's metadata, not Emby's file duration. Unknown, zero and negative
 runtimes are listed separately and sort last. To fill in missing runtimes,
 refresh the film's metadata in Radarr.
 
-Select up to 20 films, choose **Search selected in Radarr**, then confirm. The
+Pick films by their sprocket rail (or **Pick this film** on the marquee), up to 20 at a time. Your picks print on a Scudder Picture House ticket: the total running time, its length in feet of 35mm (24 frames a second, 16 frames to the foot, so 90 ft a minute, from Radarr's whole-minute runtimes), and a six-digit serial derived from the picked titles, so the same films always print the same number. Choose **Search selected in Radarr** on the stub, then confirm. The
 server re-reads the library to reject films downloaded in the meantime, then
 sends `MoviesSearch` to Radarr. A receipt means Radarr accepted the search. It
 does not mean a download started; check Radarr's Activity page. Searches must

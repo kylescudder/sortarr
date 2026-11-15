@@ -1,8 +1,11 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { CircleAlertIcon, RefreshCwIcon, SearchIcon } from 'lucide-react'
+import { CircleAlertIcon } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { filterMovies, type Filters, type Library } from '../../shared/movies'
+import { Marquee } from '@/components/picture-house/marquee'
+import { Reel } from '@/components/picture-house/reel'
+import { Ticket } from '@/components/picture-house/ticket'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   AlertDialog,
@@ -13,9 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   Empty,
@@ -96,7 +97,7 @@ function Backlog() {
   const visible = filterMovies(data?.movies ?? [], filters)
   const unknown = data?.movies.filter((m) => m.runtime === null).length ?? 0
   const chosen = visible.filter((m) => selected.includes(m.id))
-  const duration = chosen.reduce((total, m) => total + (m.runtime ?? 0), 0)
+  const feature = visible[0]
   const tagLabel = (id: number) => data?.tags.find((t) => t.id === id)?.label
 
   function update(next: Partial<Filters>) {
@@ -105,6 +106,12 @@ function Backlog() {
     setConfirming(false)
     setNotice('')
   }
+  function toggle(id: number, picked: boolean) {
+    setSelected((old) =>
+      picked ? [...old, id] : old.filter((other) => other !== id)
+    )
+    setConfirming(false)
+  }
   function refresh() {
     update({})
     search.reset()
@@ -112,72 +119,49 @@ function Backlog() {
   }
 
   return (
-    <main className='mx-auto max-w-6xl px-4 pb-32 sm:px-10'>
-      <header className='flex items-center justify-between gap-4 border-b py-6'>
-        <a href='/' className='flex flex-col leading-tight'>
-          <span className='text-2xl font-extrabold tracking-tight'>
-            Sortarr
-          </span>
-          <span className='text-muted-foreground text-sm'>
-            Find your next short watch
-          </span>
-        </a>
-        <Button variant='outline' onClick={refresh} disabled={busy}>
-          {loading ? <Spinner /> : <RefreshCwIcon />}
-          {loading ? 'Connecting…' : 'Refresh library'}
-        </Button>
-      </header>
+    <main
+      className={`mx-auto max-w-[980px] px-3.5 sm:px-8 ${chosen.length ? 'pb-56' : 'pb-16'}`}
+    >
+      <Marquee
+        feature={feature}
+        remaining={data?.movies.filter((m) => m.runtime !== null).length}
+        loading={loading}
+        busy={busy}
+        picked={!!feature && selected.includes(feature.id)}
+        onPick={() =>
+          feature && toggle(feature.id, !selected.includes(feature.id))
+        }
+        onRefresh={refresh}
+      />
 
-      <section className='grid gap-6 py-10 md:grid-cols-[1fr_auto] md:items-end'>
-        <div>
-          <p className='text-muted-foreground text-sm font-semibold tracking-wide uppercase'>
-            Your Radarr backlog
-          </p>
-          <h1 className='mt-2 text-4xl font-extrabold tracking-tight text-balance sm:text-5xl'>
-            A little time.
-            <br />A few more films.
-          </h1>
-          <p className='text-muted-foreground mt-4 max-w-prose'>
-            Start with the shortest films you’re still missing. Pick a batch and
-            let Radarr find the releases.
-          </p>
-        </div>
-        <Card className='min-w-56 gap-1 px-6 py-5'>
-          <strong className='text-4xl font-extrabold tabular-nums'>
-            {data ? data.movies.length : '—'}
-          </strong>
-          <span>films still to download</span>
-          <small className='text-muted-foreground'>
-            {data
-              ? `Updated ${new Date(data.fetchedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-              : 'Connect Radarr to see your backlog'}
-          </small>
-        </Card>
-      </section>
-
-      <section aria-label='Missing films' className='flex flex-col gap-5'>
-        <div
-          role='group'
-          aria-label='Runtime groups'
-          className='flex flex-wrap gap-2'
-        >
-          {(
-            [
-              ['known', 'Known runtime'],
-              ['unknown', `Unknown runtime (${unknown})`],
-              ['all', 'All missing']
-            ] as const
-          ).map(([value, label]) => (
-            <Button
-              key={value}
-              variant={filters.runtime === value ? 'default' : 'outline'}
-              aria-pressed={filters.runtime === value}
-              disabled={search.isPending}
-              onClick={() => update({ runtime: value, maxRuntime: 0 })}
-            >
-              {label}
-            </Button>
-          ))}
+      <section aria-label='Filters' className='mb-4 flex flex-col gap-4'>
+        <div className='flex flex-wrap items-baseline gap-x-5.5 gap-y-2'>
+          <h2 className='font-display text-lamp mr-3 text-3xl font-black tracking-[0.03em]'>
+            The reel
+          </h2>
+          <div
+            role='group'
+            aria-label='Runtime groups'
+            className='flex flex-wrap gap-x-5.5 gap-y-1'
+          >
+            {(
+              [
+                ['known', 'Known runtime'],
+                ['unknown', `Unknown runtime (${unknown})`],
+                ['all', 'All missing']
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                aria-pressed={filters.runtime === value}
+                disabled={search.isPending}
+                onClick={() => update({ runtime: value, maxRuntime: 0 })}
+                className='text-muted-foreground aria-pressed:border-lamp aria-pressed:text-foreground border-b-2 border-transparent py-1 text-[15px]'
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <fieldset disabled={busy} className='flex flex-col gap-4'>
@@ -190,6 +174,7 @@ function Backlog() {
                 placeholder='Search titles…'
                 value={filters.query}
                 onChange={(e) => update({ query: e.target.value })}
+                className='bg-deep'
               />
             </Field>
             <Field id='length' label='Length'>
@@ -236,7 +221,7 @@ function Backlog() {
               />
             </Field>
           </div>
-          <div className='flex flex-wrap gap-x-6 gap-y-3'>
+          <div className='flex flex-wrap items-center gap-x-6 gap-y-3'>
             <Toggle
               id='monitored'
               label='Monitored only'
@@ -249,6 +234,24 @@ function Backlog() {
               checked={filters.available}
               onChange={(available) => update({ available })}
             />
+            <span className='ml-auto flex gap-4 text-sm'>
+              <button
+                disabled={busy || !visible.length}
+                onClick={() =>
+                  setSelected(visible.slice(0, MAX_SELECTION).map((m) => m.id))
+                }
+                className='text-muted-foreground hover:text-foreground underline-offset-4 hover:underline disabled:opacity-50'
+              >
+                Select first {Math.min(visible.length, MAX_SELECTION)}
+              </button>
+              <button
+                disabled={!selected.length || search.isPending}
+                onClick={() => setSelected([])}
+                className='text-muted-foreground hover:text-foreground underline-offset-4 hover:underline disabled:opacity-50'
+              >
+                Clear selection
+              </button>
+            </span>
           </div>
         </fieldset>
 
@@ -259,7 +262,7 @@ function Backlog() {
           </p>
         )}
         {error && (
-          <Alert variant='destructive'>
+          <Alert variant='destructive' className='border-destructive/40'>
             <CircleAlertIcon />
             <AlertDescription>{error}</AlertDescription>
           </Alert>
@@ -267,189 +270,75 @@ function Backlog() {
         {notice && (
           <p
             role='status'
-            className='bg-accent text-accent-foreground rounded-lg border px-4 py-3 text-sm'
+            className='border-lamp/50 bg-lamp/10 rounded-lg border px-4 py-3 text-sm'
           >
             {notice}
           </p>
         )}
-
-        <div className='flex flex-wrap items-center gap-2'>
-          <span className='text-muted-foreground mr-auto text-sm'>
-            {loading ? 'Reading Radarr…' : `${visible.length} films shown`}
-          </span>
-          <Button
-            variant='outline'
-            size='sm'
-            disabled={busy || !visible.length}
-            onClick={() =>
-              setSelected(visible.slice(0, MAX_SELECTION).map((m) => m.id))
-            }
-          >
-            Select first {Math.min(visible.length, MAX_SELECTION)}
-          </Button>
-          <Button
-            variant='outline'
-            size='sm'
-            disabled={!selected.length || search.isPending}
-            onClick={() => setSelected([])}
-          >
-            Clear selection
-          </Button>
-        </div>
-
-        {!loading && data && !visible.length && (
-          <Empty className='border'>
-            <EmptyHeader>
-              <EmptyTitle>
-                <h2>No films match these filters</h2>
-              </EmptyTitle>
-              <EmptyDescription>
-                Try another runtime group, a longer duration, or include
-                unmonitored films.
-              </EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <Button
-                onClick={() =>
-                  update({
-                    ...defaults,
-                    runtime: 'all',
-                    monitored: false,
-                    available: false
-                  })
-                }
-              >
-                Show all missing films
-              </Button>
-            </EmptyContent>
-          </Empty>
-        )}
-
-        {!!visible.length && (
-          <Card className='overflow-x-auto p-0'>
-            <table className='w-full text-left text-sm'>
-              <thead className='bg-muted/60 text-muted-foreground border-b text-xs tracking-wide uppercase'>
-                <tr>
-                  <th className='w-12 px-4 py-3'>
-                    <span className='sr-only'>Select</span>
-                  </th>
-                  <th className='px-2 py-3'>Film</th>
-                  <th className='px-4 py-3 text-right'>Runtime</th>
-                  <th className='hidden px-4 py-3 md:table-cell'>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((movie) => {
-                  const isSelected = selected.includes(movie.id)
-                  return (
-                    <tr
-                      key={movie.id}
-                      data-selected={isSelected}
-                      className='data-[selected=true]:bg-accent/60 border-b align-top last:border-0'
-                    >
-                      <td className='px-4 py-3'>
-                        <Checkbox
-                          aria-label={`Select ${movie.title}`}
-                          disabled={
-                            search.isPending ||
-                            (!isSelected && selected.length >= MAX_SELECTION)
-                          }
-                          checked={isSelected}
-                          onCheckedChange={(checked) => {
-                            setSelected((old) =>
-                              checked === true
-                                ? [...old, movie.id]
-                                : old.filter((id) => id !== movie.id)
-                            )
-                            setConfirming(false)
-                          }}
-                        />
-                      </td>
-                      <td className='px-2 py-3'>
-                        <strong className='block font-semibold'>
-                          {movie.title}
-                        </strong>
-                        <span className='text-muted-foreground'>
-                          {movie.year || 'Year unknown'}
-                          {movie.genres.length
-                            ? ` · ${movie.genres.slice(0, 2).join(', ')}`
-                            : ''}
-                        </span>
-                        <details className='text-muted-foreground mt-1'>
-                          <summary className='cursor-pointer text-xs'>
-                            Film details
-                          </summary>
-                          <p className='mt-1 max-w-prose'>
-                            {movie.overview ||
-                              'No synopsis available in Radarr.'}
-                          </p>
-                          <p>
-                            {movie.tags
-                              .map(tagLabel)
-                              .filter(Boolean)
-                              .join(', ')}
-                          </p>
-                        </details>
-                      </td>
-                      <td className='px-4 py-3 text-right font-semibold whitespace-nowrap tabular-nums'>
-                        {movie.runtime === null ? (
-                          'Unknown'
-                        ) : (
-                          <>
-                            {movie.runtime}
-                            <small className='text-muted-foreground font-normal'>
-                              {' '}
-                              min
-                            </small>
-                          </>
-                        )}
-                      </td>
-                      <td className='hidden px-4 py-3 md:table-cell'>
-                        <div className='flex flex-col items-start gap-1'>
-                          <Badge
-                            variant={movie.monitored ? 'secondary' : 'outline'}
-                          >
-                            {movie.monitored ? 'Monitored' : 'Unmonitored'}
-                          </Badge>
-                          <span className='text-muted-foreground'>
-                            {movie.isAvailable
-                              ? 'Available'
-                              : 'Not yet available'}
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </Card>
-        )}
-      </section>
-
-      <section
-        aria-label='Selected films'
-        className='bg-card/95 fixed inset-x-0 bottom-0 border-t backdrop-blur'
-      >
-        <div className='mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-10'>
-          <div className='flex flex-col'>
-            <strong>{chosen.length} selected</strong>
-            <span className='text-muted-foreground text-sm'>
-              {duration} min of known runtime
-              {chosen.some((m) => m.runtime === null)
-                ? ' · includes unknown runtimes'
-                : ''}
+        <p className='text-muted-foreground text-sm'>
+          {loading ? (
+            <span className='inline-flex items-center gap-2'>
+              <Spinner className='size-3.5' />
+              Reading Radarr…
             </span>
-          </div>
-          <Button
-            disabled={!chosen.length || busy || !data}
-            onClick={() => setConfirming(true)}
-          >
-            <SearchIcon />
-            Search selected in Radarr
-          </Button>
-        </div>
+          ) : (
+            `${visible.length} films shown`
+          )}
+        </p>
       </section>
+
+      {!loading && data && !visible.length && (
+        <Empty className='border'>
+          <EmptyHeader>
+            <EmptyTitle>
+              <h2>No films match these filters</h2>
+            </EmptyTitle>
+            <EmptyDescription>
+              Try another runtime group, a longer duration, or include
+              unmonitored films.
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button
+              onClick={() =>
+                update({
+                  ...defaults,
+                  runtime: 'all',
+                  monitored: false,
+                  available: false
+                })
+              }
+            >
+              Show all missing films
+            </Button>
+          </EmptyContent>
+        </Empty>
+      )}
+
+      {!!visible.length && (
+        <Reel
+          films={visible}
+          selected={selected}
+          tagLabel={tagLabel}
+          limitReached={selected.length >= MAX_SELECTION}
+          disabled={search.isPending}
+          onToggle={toggle}
+        />
+      )}
+
+      <footer className='text-muted-foreground pt-10 text-sm'>
+        Runtimes come from Radarr metadata. Availability means released
+        according to Radarr, not a confirmed downloadable release. Up to{' '}
+        {MAX_SELECTION} films per search.
+      </footer>
+
+      {!!chosen.length && (
+        <Ticket
+          films={chosen}
+          disabled={busy || !data}
+          onSearch={() => setConfirming(true)}
+        />
+      )}
 
       <AlertDialog
         open={confirming}
@@ -480,12 +369,6 @@ function Backlog() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <footer className='text-muted-foreground pt-10 text-sm'>
-        Runtimes come from Radarr metadata. Availability means released
-        according to Radarr, not a confirmed downloadable release. Up to{' '}
-        {MAX_SELECTION} films per search.
-      </footer>
     </main>
   )
 }
@@ -501,7 +384,9 @@ function Field({
 }) {
   return (
     <div className='flex flex-col gap-2'>
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id} className='text-muted-foreground'>
+        {label}
+      </Label>
       {children}
     </div>
   )
@@ -522,7 +407,7 @@ function Choice({
 }) {
   return (
     <Select value={value} onValueChange={onChange} disabled={disabled}>
-      <SelectTrigger id={id} className='bg-card w-full'>
+      <SelectTrigger id={id} className='bg-deep w-full'>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

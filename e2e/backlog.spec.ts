@@ -1,4 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
+const reel = (page: Page) => page.getByRole('list', { name: 'Missing films' })
+const rows = (page: Page) => reel(page).getByRole('listitem')
 // Radix Select renders a combobox button and a listbox, not a native <select>.
 async function choose(page: Page, label: string, option: string) {
   await page.getByRole('combobox', { name: label, exact: true }).click()
@@ -12,8 +14,13 @@ test('finds the shortest missing films and searches a selected batch', async ({
   request
 }, info) => {
   await page.goto('/')
-  const rows = page.locator('tbody tr')
+  const rows = page
+    .getByRole('list', { name: 'Missing films' })
+    .getByRole('listitem')
   await expect(rows).toHaveCount(3)
+  await expect(
+    page.getByRole('region', { name: 'Shortest film you are missing' })
+  ).toContainText('Doodlebug')
   await expect(rows.nth(0)).toContainText('Doodlebug')
   await expect(rows.nth(1)).toContainText('Meshes of the Afternoon')
   await expect(
@@ -22,7 +29,17 @@ test('finds the shortest missing films and searches a selected batch', async ({
   await choose(page, 'Length', '20 minutes or less')
   await expect(rows).toHaveCount(2)
   await choose(page, 'Tag', 'Director shorts')
+  await expect(page.getByRole('region', { name: 'Your ticket' })).toHaveCount(0)
   await page.getByLabel('Select Doodlebug', { exact: true }).check()
+  await expect(
+    page.getByRole('button', { name: 'Picked', exact: true })
+  ).toHaveAttribute('aria-pressed', 'true')
+  const ticket = page.getByRole('region', { name: 'Your ticket' })
+  await expect(ticket).toContainText('SCUDDER PICTURE HOUSE')
+  await expect(ticket).toContainText('ADMIT 1')
+  await expect(ticket).toContainText('3 MIN')
+  await expect(ticket).toContainText('270 ft of 35mm')
+  await expect(ticket.getByLabel(/^Serial \d{6}$/)).toHaveCount(2)
   await page.getByRole('button', { name: 'Search selected in Radarr' }).click()
   await expect(
     page.getByRole('alertdialog', { name: 'Search for 1 film?' })
@@ -59,7 +76,7 @@ test('separates unknown runtimes and filters title, availability and monitoring'
   page
 }, info) => {
   await page.goto('/')
-  await expect(page.locator('tbody tr')).toHaveCount(3)
+  await expect(rows(page)).toHaveCount(3)
   await page
     .getByRole('button', { name: 'Unknown runtime (1)', exact: true })
     .click()
@@ -69,8 +86,8 @@ test('separates unknown runtimes and filters title, availability and monitoring'
   await expect(
     page.getByRole('button', { name: 'Known runtime', exact: true })
   ).toHaveAttribute('aria-pressed', 'false')
-  await expect(page.locator('tbody tr')).toHaveCount(1)
-  await expect(page.locator('tbody')).toContainText('Unknown Length')
+  await expect(rows(page)).toHaveCount(1)
+  await expect(reel(page)).toContainText('Unknown Length')
   await expect(
     page.getByRole('combobox', { name: 'Length', exact: true })
   ).toBeDisabled()
@@ -81,16 +98,16 @@ test('separates unknown runtimes and filters title, availability and monitoring'
   await page.getByRole('button', { name: 'All missing', exact: true }).click()
   await page.getByLabel('Monitored only').uncheck()
   await page.getByLabel('Available according to Radarr').uncheck()
-  await expect(page.locator('tbody tr')).toHaveCount(6)
+  await expect(rows(page)).toHaveCount(6)
   await choose(page, 'Sort by', 'Longest first')
-  await expect(page.locator('tbody tr').first()).toContainText('Following')
-  await expect(page.locator('tbody tr').last()).toContainText('Unknown Length')
+  await expect(rows(page).first()).toContainText('Following')
+  await expect(rows(page).last()).toContainText('Unknown Length')
   await page.getByLabel('Find a film').fill('nothing matches')
   await expect(
     page.getByRole('heading', { name: 'No films match these filters' })
   ).toBeVisible()
   await page.getByRole('button', { name: 'Show all missing films' }).click()
-  await expect(page.locator('tbody tr')).toHaveCount(6)
+  await expect(rows(page)).toHaveCount(6)
 })
 test('shows connection failures and recovers on refresh', async ({
   page,
@@ -109,7 +126,7 @@ test('shows connection failures and recovers on refresh', async ({
   })
   await request.post('http://127.0.0.1:43211/control', { data: { mode: '' } })
   await page.getByRole('button', { name: 'Refresh library' }).click()
-  await expect(page.locator('tbody tr')).toHaveCount(3)
+  await expect(rows(page)).toHaveCount(3)
 })
 test('rejects stale selections and reports failed searches without success', async ({
   page,
