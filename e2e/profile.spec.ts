@@ -20,8 +20,13 @@ for (const iphoneLimit of [false, true])
   }, info) => {
     if (iphoneLimit)
       await page.addInitScript(() => {
-        window.createImageBitmap = () =>
-          Promise.reject(new DOMException('decode limit', 'InvalidStateError'))
+        window.createImageBitmap = (image: ImageBitmapSource) =>
+          Promise.reject(
+            new DOMException(
+              `iOS decode limit for ${image.constructor.name}`,
+              'InvalidStateError'
+            )
+          )
       })
     await page.goto('/profile')
     await page.getByRole('button', { name: 'Sign out' }).waitFor()
