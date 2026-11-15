@@ -3,6 +3,7 @@ import type { Library } from '../shared/movies'
 import { readOriginEnv, readRadarrEnv } from './env'
 import { ApiError } from './errors'
 import {
+  CLOCK_SKEW_MS,
   deriveStatuses,
   type CommandState,
   type SearchRecord
@@ -185,7 +186,7 @@ export async function activity(searches: SearchRecord[], now = Date.now()) {
     radarr('queue?page=1&pageSize=1000&includeMovie=false'),
     searches.length
       ? radarr(
-          `history/since?date=${encodeURIComponent(new Date(oldest).toISOString())}&eventType=grabbed`
+          `history/since?date=${encodeURIComponent(new Date(oldest - CLOCK_SKEW_MS).toISOString())}&eventType=grabbed`
         )
       : [],
     Promise.all(
