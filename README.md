@@ -86,6 +86,17 @@ sends `MoviesSearch` to Radarr. A receipt means Radarr accepted the search. It
 does not mean a download started; check Radarr's Activity page. Searches must
 come from the app's own origin (`APP_ORIGIN` in production).
 
+## Search progress
+
+Each film shows what Radarr is doing with it, read live from Radarr so it
+survives a refresh and looks the same on every device: searching,
+downloading (with percentage and time left), importing, grabbed, no release
+found, or needs attention (Radarr's own warning). Sortarr records each search
+it sends (who, which films, Radarr's command id) in `search_request`, because
+Radarr doesn't record searches that find nothing. Statuses cover the past
+week; the page polls every 5 seconds while anything is moving and every
+minute otherwise, and reloads the backlog when a film finishes importing.
+
 ## Sign-in
 
 Better Auth with password, email code, magic link and passkey, as in the other

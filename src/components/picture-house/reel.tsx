@@ -1,4 +1,6 @@
 import type { Movie } from '../../../shared/movies'
+import type { StatusMap } from '../../../shared/status'
+import { FilmStatusLine } from './film-status'
 
 export function Reel({
   films,
@@ -6,7 +8,9 @@ export function Reel({
   tagLabel,
   limitReached,
   disabled,
-  onToggle
+  onToggle,
+  statuses = {},
+  now = Date.now()
 }: {
   films: Movie[]
   selected: number[]
@@ -14,6 +18,8 @@ export function Reel({
   limitReached: boolean
   disabled: boolean
   onToggle: (id: number, picked: boolean) => void
+  statuses?: StatusMap
+  now?: number
 }) {
   return (
     <ol aria-label='Missing films' className='border-b'>
@@ -59,6 +65,14 @@ export function Reel({
                 <p className='text-muted-foreground mt-1 line-clamp-2 max-w-[62ch] text-[15px]'>
                   {movie.overview}
                 </p>
+              )}
+              {statuses[movie.id] && (
+                <FilmStatusLine
+                  status={statuses[movie.id]}
+                  now={now}
+                  canPick={!picked && !limitReached && !disabled}
+                  onSearchAgain={() => onToggle(movie.id, true)}
+                />
               )}
             </div>
           </li>

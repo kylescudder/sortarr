@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import postgres from 'postgres'
 const reel = (page: Page) => page.getByRole('list', { name: 'Missing films' })
 const rows = (page: Page) => reel(page).getByRole('listitem')
 // Radix Select renders a combobox button and a listbox, not a native <select>.
@@ -8,6 +9,17 @@ async function choose(page: Page, label: string, option: string) {
 }
 test.beforeEach(async ({ request }) => {
   await request.post('http://127.0.0.1:43211/control', { data: { mode: '' } })
+  // Each test starts with no search history in the throwaway e2e database
+  // (bun run test:e2e provides DATABASE_URL).
+  const sql = postgres(process.env.DATABASE_URL!, {
+    max: 1,
+    onnotice: () => {}
+  })
+  try {
+    await sql`DELETE FROM search_request`
+  } finally {
+    await sql.end()
+  }
 })
 test('finds the shortest missing films and searches a selected batch', async ({
   page,
@@ -188,6 +200,7 @@ test('signed-out visitors are sent to sign-in and the API refuses them', async (
     await expect(page.getByText('Sign in to Sortarr')).toBeVisible()
     for (const [method, path] of [
       ['GET', '/api/library'],
+      ['GET', '/api/status'],
       ['POST', '/api/search']
     ] as const) {
       const response = await context.request.fetch(path, {
@@ -203,4 +216,92 @@ test('signed-out visitors are sent to sign-in and the API refuses them', async (
   } finally {
     await context.close()
   }
+})
+
+test('shows each film’s search and download progress, and keeps it after a refresh', async ({
+  page,
+  request
+}, info) => {
+  const progress = (body: object) =>
+    request.post('http://127.0.0.1:43211/control', { data: { progress: body } })
+  await page.goto('/')
+  await page.getByLabel('Select Doodlebug', { exact: true }).check()
+  await page.getByRole('button', { name: 'Search selected in Radarr' }).click()
+  await page
+    .getByRole('button', { name: 'Confirm search', exact: true })
+    .click()
+  const doodlebug = rows(page).filter({ hasText: 'Doodlebug' })
+  await expect(doodlebug).toContainText('Searching Radarr…')
+  await expect(page.getByText('1 searching or downloading')).toBeVisible()
+  // Progress comes from Radarr and the stored ticket, not the page.
+  await page.reload()
+  await expect(doodlebug).toContainText('Searching Radarr…')
+  await progress({
+    queue: [
+      {
+        movieId: 1,
+        status: 'downloading',
+        trackedDownloadStatus: 'ok',
+        trackedDownloadState: 'downloading',
+        size: 1000,
+        sizeleft: 600,
+        timeleft: '00:07:00'
+      }
+    ]
+  })
+  await expect(doodlebug).toContainText('Downloading 40%, about 7 min left', {
+    timeout: 15000
+  })
+  await page.screenshot({
+    path: info.outputPath('downloading.png'),
+    fullPage: true
+  })
+  // Once Radarr imports it, the film leaves the backlog by itself.
+  await progress({ queue: [], commandStatus: 'completed', mode: 'downloaded' })
+  await expect(doodlebug).toHaveCount(0, { timeout: 15000 })
+})
+
+test('says when a search found nothing and offers to pick the film again', async ({
+  page,
+  request
+}) => {
+  await request.post('http://127.0.0.1:43211/control', {
+    data: { progress: { commandStatus: 'completed' } }
+  })
+  await page.goto('/')
+  await page
+    .getByLabel('Select Meshes of the Afternoon', { exact: true })
+    .check()
+  await page.getByRole('button', { name: 'Search selected in Radarr' }).click()
+  await page
+    .getByRole('button', { name: 'Confirm search', exact: true })
+    .click()
+  const meshes = rows(page).filter({ hasText: 'Meshes of the Afternoon' })
+  await expect(meshes).toContainText('No release found when searched')
+  await meshes.getByRole('button', { name: 'Pick to search again' }).click()
+  await expect(
+    page.getByLabel('Select Meshes of the Afternoon', { exact: true })
+  ).toBeChecked()
+  await expect(page.getByRole('region', { name: 'Your ticket' })).toContainText(
+    'ADMIT 1'
+  )
+})
+
+test('says when progress can’t be checked, without hiding the backlog', async ({
+  page,
+  request
+}) => {
+  await request.post('http://127.0.0.1:43211/control', {
+    data: { mode: 'queue-failed' }
+  })
+  await page.goto('/')
+  await expect(rows(page)).toHaveCount(3)
+  await expect(
+    page.getByText(
+      'Couldn’t check progress with Radarr: Radarr returned HTTP 500.'
+    )
+  ).toBeVisible()
+  await expect(
+    page.getByText('Progress isn’t shown until Radarr answers.')
+  ).toBeVisible()
 })
