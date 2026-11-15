@@ -1,7 +1,9 @@
+import sharp from 'sharp'
 const movies = [
   {
     id: 1,
     title: 'Doodlebug',
+    images: [{ coverType: 'poster' }],
     year: 1997,
     runtime: 3,
     hasFile: false,
@@ -15,6 +17,7 @@ const movies = [
   {
     id: 2,
     title: 'Meshes of the Afternoon',
+    images: [{ coverType: 'poster' }],
     year: 1943,
     runtime: 14,
     hasFile: false,
@@ -91,6 +94,12 @@ const movies = [
     status: 'announced'
   }
 ]
+// A small JPEG standing in for Radarr's resized posters.
+const posterJpeg = await sharp({
+  create: { width: 250, height: 375, channels: 3, background: '#7a3d14' }
+})
+  .jpeg()
+  .toBuffer()
 let mode = ''
 let commands: unknown[] = []
 let requests: string[] = []
@@ -139,6 +148,15 @@ const mock = Bun.serve({
       commands.push(await request.json())
       return Response.json({ id: 42, status: 'queued' }, { status: 201 })
     }
+    const poster = pathname.match(
+      /^\/radarr\/api\/v3\/mediacover\/(\d+)\/poster-(250|500)\.jpg$/
+    )
+    if (poster)
+      return ['1', '2'].includes(poster[1])
+        ? new Response(posterJpeg, {
+            headers: { 'Content-Type': 'image/jpeg' }
+          })
+        : new Response(null, { status: 404 })
     if (pathname === '/radarr/api/v3/command/42')
       return Response.json({ id: 42, status: commandStatus })
     if (pathname === '/radarr/api/v3/queue' && mode === 'queue-failed')

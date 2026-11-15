@@ -50,7 +50,9 @@ const server = Bun.serve({
     const response = await app.fetch(request)
     response.headers.set('X-Content-Type-Options', 'nosniff')
     response.headers.set('Referrer-Policy', 'same-origin')
-    response.headers.set('Cache-Control', 'no-store')
+    // Routes may opt into caching (posters); everything else is no-store.
+    if (!response.headers.has('Cache-Control'))
+      response.headers.set('Cache-Control', 'no-store')
     response.headers.set('X-Sortarr-Revision', revision())
     return response
   }

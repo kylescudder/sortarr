@@ -1,6 +1,7 @@
 import type { Movie } from '../../../shared/movies'
 import type { StatusMap } from '../../../shared/status'
 import { FilmStatusLine } from './film-status'
+import { Poster } from './poster'
 
 export function Reel({
   films,
@@ -29,7 +30,7 @@ export function Reel({
         return (
           <li
             key={movie.id}
-            className='grid grid-cols-[30px_40px_1fr] gap-x-3 border-t sm:grid-cols-[40px_56px_1fr] sm:gap-x-4.5'
+            className='grid grid-cols-[30px_40px_56px_1fr] gap-x-3 border-t sm:grid-cols-[40px_56px_72px_1fr] sm:gap-x-4.5'
           >
             {/* The sprocket rail is the control: picked films let the light through. */}
             <button
@@ -47,6 +48,13 @@ export function Reel({
               <small className='mt-1 block font-sans text-[13px] font-semibold'>
                 {movie.runtime === null ? 'unknown' : 'min'}
               </small>
+            </div>
+            <div className='py-4.5'>
+              <Poster
+                movie={movie}
+                size={250}
+                className={`w-full rounded-[3px] ${picked ? 'ring-lamp ring-2' : 'ring-border ring-1'}`}
+              />
             </div>
             <div className='min-w-0 py-4.5'>
               <h3 className='font-display text-[21px] leading-tight font-extrabold tracking-[0.02em] sm:text-[26px]'>

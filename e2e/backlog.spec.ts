@@ -201,6 +201,7 @@ test('signed-out visitors are sent to sign-in and the API refuses them', async (
     for (const [method, path] of [
       ['GET', '/api/library'],
       ['GET', '/api/status'],
+      ['GET', '/api/poster/1'],
       ['POST', '/api/search']
     ] as const) {
       const response = await context.request.fetch(path, {
@@ -304,4 +305,34 @@ test('says when progress can’t be checked, without hiding the backlog', async 
   await expect(
     page.getByText('Progress isn’t shown until Radarr answers.')
   ).toBeVisible()
+})
+
+test('shows Radarr’s posters on the marquee and the reel, with a plain card when there is none', async ({
+  page
+}) => {
+  await page.goto('/')
+  const loaded = (name: string) =>
+    expect
+      .poll(() =>
+        page
+          .getByRole('img', { name, exact: true })
+          .first()
+          .evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)
+      )
+      .toBeGreaterThan(0)
+  // Marquee (500 px) and reel (250 px) copies of Doodlebug's poster.
+  await expect(
+    page.getByRole('img', { name: 'Poster for Doodlebug', exact: true })
+  ).toHaveCount(2)
+  await loaded('Poster for Doodlebug')
+  await loaded('Poster for Meshes of the Afternoon')
+  // Following has no poster in Radarr: a placeholder, not a broken image.
+  await expect(
+    rows(page).filter({ hasText: 'Following' }).getByRole('img')
+  ).toHaveCount(0)
+  const response = await page.request.get('/api/poster/1')
+  expect(response.headers()['content-type']).toBe('image/jpeg')
+  expect(response.headers()['cache-control']).toBe('private, max-age=86400')
+  expect((await page.request.get('/api/poster/3')).status()).toBe(404)
+  expect((await page.request.get('/api/poster/nope')).status()).toBe(404)
 })

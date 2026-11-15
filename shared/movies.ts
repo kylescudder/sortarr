@@ -9,6 +9,8 @@ export interface Movie {
   genres: string[]
   overview: string
   status: string
+  // Radarr has a poster for this film (served through /api/poster/:id).
+  hasPoster: boolean
 }
 export interface Library {
   movies: Movie[]
