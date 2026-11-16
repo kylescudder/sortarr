@@ -12,7 +12,9 @@ export default defineConfig({
   ],
   outputDir: 'state/e2e/test-results',
   use: {
-    baseURL: 'http://127.0.0.1:43210',
+    // localhost, not 127.0.0.1: WebAuthn refuses IP addresses as relying-party
+    // IDs, and the passkey test needs one. The server still binds 127.0.0.1.
+    baseURL: 'http://localhost:43210',
     storageState: 'state/e2e/auth.json',
     screenshot: 'on',
     trace: 'retain-on-failure'

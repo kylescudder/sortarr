@@ -160,7 +160,7 @@ try {
 
   // e2e/serve.ts runs the production server on 43210 beside a fake Radarr on 43211.
   const port = 43210
-  const origin = `http://127.0.0.1:${port}`
+  const origin = `http://localhost:${port}`
   const child = spawn(
     'bunx',
     ['--no-install', 'playwright', 'test', ...process.argv.slice(2)],
