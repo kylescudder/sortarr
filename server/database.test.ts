@@ -10,6 +10,7 @@ if (!process.env.TEST_DATABASE_URL)
   throw new Error('TEST_DATABASE_URL must point to disposable PostgreSQL')
 const admin = postgres(process.env.TEST_DATABASE_URL, {
   max: 1,
+  connect_timeout: 2,
   onnotice: () => {}
 })
 // Mirrors production: an owner role that owns the database and runs
@@ -26,7 +27,11 @@ function client(user: string, database = name) {
   url.username = user
   url.password = ''
   url.pathname = '/' + database
-  const sql = postgres(url.toString(), { max: 1, onnotice: () => {} })
+  const sql = postgres(url.toString(), {
+    max: 1,
+    connect_timeout: 2,
+    onnotice: () => {}
+  })
   clients.push(sql)
   return sql
 }
@@ -495,6 +500,41 @@ test('application pool reuses connections, retires idle backends and reconnects'
   const [reconnected] = await applicationSql`SELECT pg_backend_pid() AS pid`
   assert.notEqual(reconnected.pid, first.pid)
 }, 30000)
+
+test('application settings fail fast when a role connection limit refuses a connection', async () => {
+  // postgres.js v4 retries 53300 until connect_timeout; the app must not hang.
+  const limitedName = name + '_limited'
+  await admin.unsafe(
+    `CREATE ROLE "${limitedName}" LOGIN NOSUPERUSER CONNECTION LIMIT 1`
+  )
+  await admin.unsafe(`GRANT CONNECT ON DATABASE "${name}" TO "${limitedName}"`)
+  const url = new URL(process.env.DATABASE_URL!)
+  url.username = limitedName
+  const { databaseOptions } = await import('../src/server/db')
+  const holder = postgres(url.toString(), databaseOptions)
+  const refused = postgres(url.toString(), databaseOptions)
+  try {
+    await holder`SELECT 1`
+    const started = performance.now()
+    await assert.rejects(
+      Promise.resolve(refused`SELECT 1`),
+      (error: unknown) => {
+        return (error as { code?: string }).code === '53300'
+      }
+    )
+    const elapsed = performance.now() - started
+    assert.ok(
+      elapsed < 5000,
+      `Refused connection took ${Math.round(elapsed)} ms`
+    )
+  } finally {
+    await Promise.all([holder.end({ timeout: 1 }), refused.end({ timeout: 1 })])
+    await admin.unsafe(
+      `REVOKE CONNECT ON DATABASE "${name}" FROM "${limitedName}"`
+    )
+    await admin.unsafe(`DROP ROLE "${limitedName}"`)
+  }
+}, 15000)
 
 let fixtureNumber = 0
 async function authFixture(dailyEmailLimit = 40, failMail = false) {

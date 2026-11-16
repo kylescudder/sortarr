@@ -50,6 +50,13 @@ tables and `user_profile` for profile photos. Generate migrations with
 Migrations are additive. Dropping a column takes two releases: stop using it,
 then drop it.
 
+The app connects with postgres.js v4. When PostgreSQL refuses a connection
+because there are too many connections (`53300`), v4 retries until
+`connect_timeout` has passed instead of failing at once. Every client here (the
+app in `src/server/db.ts`, migrations, tests and the e2e harness) sets
+`connect_timeout: 2`, so a refused connection fails in about 3 seconds rather
+than leaving pages waiting.
+
 ## Deployment
 
 Sortarr runs as a service in the udms Compose stack on Forge

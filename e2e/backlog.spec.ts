@@ -13,6 +13,7 @@ test.beforeEach(async ({ request }) => {
   // (bun run test:e2e provides DATABASE_URL).
   const sql = postgres(process.env.DATABASE_URL!, {
     max: 1,
+    connect_timeout: 2,
     onnotice: () => {}
   })
   try {
