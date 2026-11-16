@@ -181,7 +181,7 @@ test('rejects cross-origin and invalid search submissions', async ({
   })
   expect(cross.status()).toBe(403)
   const invalid = await request.post('/api/search', {
-    headers: { Origin: 'http://127.0.0.1:43210' },
+    headers: { Origin: 'http://localhost:43210' },
     data: { movieIds: [] }
   })
   expect(invalid.status()).toBe(400)
@@ -206,7 +206,7 @@ test('signed-out visitors are sent to sign-in and the API refuses them', async (
     ] as const) {
       const response = await context.request.fetch(path, {
         method,
-        headers: { Origin: 'http://127.0.0.1:43210' },
+        headers: { Origin: 'http://localhost:43210' },
         data: method === 'POST' ? { movieIds: [1] } : undefined
       })
       expect(response.status()).toBe(401)
